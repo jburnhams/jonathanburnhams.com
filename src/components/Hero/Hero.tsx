@@ -14,6 +14,11 @@ function Hero() {
           <span className="hero-name">Jonathan Burnhams</span>
         </h1>
         <div className="hero-underline" aria-hidden="true"></div>
+        <div className="hero-links">
+          <a href="https://www.strava.com/athletes/jburnhams" target="_blank" rel="noopener noreferrer" className="hero-link">
+            🏃‍♂️ Strava 🏃‍♀️
+          </a>
+        </div>
       </div>
     </section>
   )

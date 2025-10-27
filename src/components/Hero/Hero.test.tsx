@@ -47,4 +47,19 @@ describe('Hero', () => {
     const underline = container.querySelector('.hero-underline')
     expect(underline).toHaveAttribute('aria-hidden', 'true')
   })
+
+  it('renders the Strava link correctly', () => {
+    render(<Hero />)
+    const stravaLink = screen.getByText(/Strava/, { exact: false })
+    expect(stravaLink).toBeInTheDocument()
+    expect(stravaLink).toHaveAttribute('href', 'https://www.strava.com/athletes/jburnhams')
+    expect(stravaLink).toHaveAttribute('target', '_blank')
+    expect(stravaLink).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('includes runner emojis in the Strava link', () => {
+    render(<Hero />)
+    const stravaLink = screen.getByText(/🏃‍♂️.*Strava.*🏃‍♀️/)
+    expect(stravaLink).toBeInTheDocument()
+  })
 })
