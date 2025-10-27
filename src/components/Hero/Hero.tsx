@@ -18,6 +18,9 @@ function Hero() {
           <a href="https://www.strava.com/athletes/jburnhams" target="_blank" rel="noopener noreferrer" className="hero-link">
             🏃‍♂️ Strava 🏃‍♀️
           </a>
+          <a href="https://www.youtube.com/@JonathanBurnhams" target="_blank" rel="noopener noreferrer" className="hero-link">
+            📹 YouTube 🎬
+          </a>
         </div>
       </div>
     </section>

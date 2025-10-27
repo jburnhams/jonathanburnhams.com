@@ -62,4 +62,19 @@ describe('Hero', () => {
     const stravaLink = screen.getByText(/🏃‍♂️.*Strava.*🏃‍♀️/)
     expect(stravaLink).toBeInTheDocument()
   })
+
+  it('renders the YouTube link correctly', () => {
+    render(<Hero />)
+    const youtubeLink = screen.getByText(/YouTube/, { exact: false })
+    expect(youtubeLink).toBeInTheDocument()
+    expect(youtubeLink).toHaveAttribute('href', 'https://www.youtube.com/@JonathanBurnhams')
+    expect(youtubeLink).toHaveAttribute('target', '_blank')
+    expect(youtubeLink).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('includes video emojis in the YouTube link', () => {
+    render(<Hero />)
+    const youtubeLink = screen.getByText(/📹.*YouTube.*🎬/)
+    expect(youtubeLink).toBeInTheDocument()
+  })
 })
