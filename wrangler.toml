@@ -1,0 +1,10 @@
+# Cloudflare Pages configuration
+name = "jonathanburnhams-com"
+compatibility_date = "2024-01-01"
+
+[build]
+command = "npm run build"
+directory = "dist"
+
+[[build.environment_variables]]
+NODE_VERSION = "18"

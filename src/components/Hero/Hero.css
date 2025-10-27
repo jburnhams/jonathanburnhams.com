@@ -1,0 +1,123 @@
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  padding: 2rem;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.1) 0%,
+    transparent 70%
+  );
+  animation: pulse 8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.hero-title {
+  margin: 0;
+  padding: 0;
+}
+
+.hero-name {
+  display: inline-block;
+  font-size: clamp(2.5rem, 8vw, 6rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(
+    135deg,
+    #fff 0%,
+    #a78bfa 50%,
+    #6366f1 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fadeInUp 1s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-underline {
+  width: 0;
+  height: 4px;
+  margin: 1.5rem auto 0;
+  background: linear-gradient(90deg, #6366f1, #a78bfa);
+  border-radius: 2px;
+  animation: expandWidth 1s ease-out 0.5s forwards;
+}
+
+@keyframes expandWidth {
+  from {
+    width: 0;
+  }
+  to {
+    width: 200px;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .hero {
+    padding: 1rem;
+  }
+
+  .hero-name {
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .hero::before,
+  .hero-name,
+  .hero-underline {
+    animation: none;
+  }
+
+  .hero-name {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hero-underline {
+    width: 200px;
+  }
+}
