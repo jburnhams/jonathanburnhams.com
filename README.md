@@ -125,21 +125,29 @@ jonathanburnhams.com/
 
 This project is configured for deployment on Cloudflare Pages.
 
-1. Connect your GitHub repository to Cloudflare Pages
-2. Configure the build settings:
+#### Option 1: Git Integration (Recommended)
+
+1. Connect your GitHub repository to Cloudflare Pages via the Cloudflare Dashboard
+2. Cloudflare will automatically detect the build settings from `wrangler.toml`
+3. Alternatively, manually configure the build settings:
    - **Build command**: `npm run build`
    - **Build output directory**: `dist`
-   - **Node version**: 18
+   - **Root directory**: `/` (project root)
+   - **Node version**: 18 (set via Environment Variables: `NODE_VERSION=18`)
 
-The `wrangler.toml` file contains the configuration for Cloudflare Pages.
+#### Option 2: Direct Upload with Wrangler
 
-### Manual Deployment
-
-You can also deploy manually using Wrangler:
+You can deploy manually using Wrangler CLI:
 
 ```bash
+# First build the project
+npm run build
+
+# Deploy to Cloudflare Pages
 npx wrangler pages deploy dist
 ```
+
+The `wrangler.toml` file contains the Pages configuration with `pages_build_output_dir` set to `dist`.
 
 ## Testing Strategy
 
