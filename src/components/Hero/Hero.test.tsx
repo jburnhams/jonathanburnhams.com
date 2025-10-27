@@ -77,4 +77,19 @@ describe('Hero', () => {
     const youtubeLink = screen.getByText(/📹.*YouTube.*🎬/)
     expect(youtubeLink).toBeInTheDocument()
   })
+
+  it('renders the GitHub link correctly', () => {
+    render(<Hero />)
+    const githubLink = screen.getByText(/GitHub/, { exact: false })
+    expect(githubLink).toBeInTheDocument()
+    expect(githubLink).toHaveAttribute('href', 'https://github.com/jburnhams')
+    expect(githubLink).toHaveAttribute('target', '_blank')
+    expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('includes developer and rocket emojis in the GitHub link', () => {
+    render(<Hero />)
+    const githubLink = screen.getByText(/👨‍💻.*GitHub.*🚀/)
+    expect(githubLink).toBeInTheDocument()
+  })
 })

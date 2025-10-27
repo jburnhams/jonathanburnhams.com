@@ -21,6 +21,9 @@ function Hero() {
           <a href="https://www.youtube.com/@JonathanBurnhams" target="_blank" rel="noopener noreferrer" className="hero-link">
             📹 YouTube 🎬
           </a>
+          <a href="https://github.com/jburnhams" target="_blank" rel="noopener noreferrer" className="hero-link">
+            👨‍💻 GitHub 💻
+          </a>
         </div>
       </div>
     </section>
