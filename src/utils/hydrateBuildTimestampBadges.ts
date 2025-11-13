@@ -1,9 +1,8 @@
-const BUILD_TIMESTAMP_PLACEHOLDER = '__BUILD_TIMESTAMP__'
 const BUILD_TIMESTAMP_ATTRIBUTE = 'data-build-timestamp'
 const FALLBACK_TEXT = 'Build timestamp unavailable'
 
-function formatTimestamp(rawValue: string) {
-  if (!rawValue || rawValue === BUILD_TIMESTAMP_PLACEHOLDER) {
+function formatTimestamp(rawValue: string | null) {
+  if (!rawValue) {
     return null
   }
 
@@ -32,7 +31,7 @@ export function hydrateBuildTimestampBadges() {
 
   badges.forEach((badge) => {
     const rawValue = badge.getAttribute(BUILD_TIMESTAMP_ATTRIBUTE)
-    const formattedValue = rawValue ? formatTimestamp(rawValue) : null
+    const formattedValue = formatTimestamp(rawValue)
 
     badge.textContent = formattedValue ?? FALLBACK_TEXT
   })

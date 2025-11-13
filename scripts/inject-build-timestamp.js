@@ -1,33 +1,15 @@
-import { readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-const PLACEHOLDER = '__BUILD_TIMESTAMP__'
 const DIST_DIR = path.resolve('dist')
+const BUILD_INFO_FILENAME = 'build-info.js'
+const BUILD_INFO_PATH = path.join(DIST_DIR, BUILD_INFO_FILENAME)
 
-async function* walk(directory) {
-  const entries = await readdir(directory, { withFileTypes: true })
-  for (const entry of entries) {
-    const entryPath = path.join(directory, entry.name)
-    if (entry.isDirectory()) {
-      yield* walk(entryPath)
-    } else if (entry.isFile()) {
-      yield entryPath
-    }
-  }
+function createBuildInfoContents(timestamp) {
+  return `;(function () {\n  const buildInfo = {\n    buildTimestamp: '${timestamp}'\n  }\n\n  window.__BUILD_INFO__ = window.__BUILD_INFO__ ?? buildInfo\n})();\n`
 }
 
-async function replacePlaceholderInFile(filePath, timestamp) {
-  const content = await readFile(filePath, 'utf8')
-  if (!content.includes(PLACEHOLDER)) {
-    return false
-  }
-
-  const updatedContent = content.replaceAll(PLACEHOLDER, timestamp)
-  await writeFile(filePath, updatedContent)
-  return true
-}
-
-async function run() {
+async function ensureDistDirectory() {
   try {
     const distStats = await stat(DIST_DIR)
     if (!distStats.isDirectory()) {
@@ -36,25 +18,49 @@ async function run() {
   } catch (error) {
     console.error('[build-timestamp] Unable to locate dist directory:', error)
     process.exitCode = 1
+    throw error
+  }
+}
+
+async function ensureBuildInfoFileExists() {
+  try {
+    await stat(BUILD_INFO_PATH)
+  } catch (error) {
+    console.error(`[build-timestamp] Expected ${BUILD_INFO_FILENAME} to exist in dist but it was missing.`)
+    process.exitCode = 1
+    throw error
+  }
+}
+
+async function run() {
+  try {
+    await ensureDistDirectory()
+    await ensureBuildInfoFileExists()
+  } catch {
     return
   }
 
   const timestamp = new Date().toISOString()
-  const updatedFiles = []
+  const contents = createBuildInfoContents(timestamp)
 
-  for await (const filePath of walk(DIST_DIR)) {
-    const replaced = await replacePlaceholderInFile(filePath, timestamp)
-    if (replaced) {
-      updatedFiles.push(path.relative(DIST_DIR, filePath))
-    }
-  }
-
-  if (!updatedFiles.length) {
-    console.warn('[build-timestamp] No placeholders were replaced.')
+  try {
+    await writeFile(BUILD_INFO_PATH, contents)
+    console.log(`[build-timestamp] Injected timestamp into ${BUILD_INFO_FILENAME}.`)
+  } catch (error) {
+    console.error('[build-timestamp] Failed to write build info file:', error)
+    process.exitCode = 1
     return
   }
 
-  console.log(`[build-timestamp] Injected timestamp into ${updatedFiles.length} file(s).`)
+  try {
+    const verificationContents = await readFile(BUILD_INFO_PATH, 'utf8')
+    if (!verificationContents.includes(timestamp)) {
+      throw new Error('Timestamp verification failed')
+    }
+  } catch (error) {
+    console.error('[build-timestamp] Verification failed after writing build info file:', error)
+    process.exitCode = 1
+  }
 }
 
 run()

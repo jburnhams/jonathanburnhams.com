@@ -1,10 +1,11 @@
 import './BuildTimestampBadge.css'
-
-const BUILD_TIMESTAMP_PLACEHOLDER = '__BUILD_TIMESTAMP__'
+import { getBuildTimestamp } from '../../utils/getBuildTimestamp'
 
 function BuildTimestampBadge() {
+  const buildTimestamp = getBuildTimestamp()
+
   return (
-    <div className="build-timestamp" data-build-timestamp={BUILD_TIMESTAMP_PLACEHOLDER}>
+    <div className="build-timestamp" data-build-timestamp={buildTimestamp}>
       Build timestamp unavailable
     </div>
   )
