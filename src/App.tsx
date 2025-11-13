@@ -1,5 +1,6 @@
 import './App.css'
 import Hero from './components/Hero/Hero'
+import BuildTimestampBadge from './components/BuildTimestampBadge/BuildTimestampBadge'
 
 /**
  * Main application component
@@ -11,6 +12,7 @@ function App() {
   return (
     <div className="app">
       <Hero />
+      <BuildTimestampBadge />
     </div>
   )
 }

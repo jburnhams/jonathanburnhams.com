@@ -87,9 +87,9 @@ describe('Hero', () => {
     expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
-  it('includes developer and rocket emojis in the GitHub link', () => {
+  it('includes developer and laptop emojis in the GitHub link', () => {
     render(<Hero />)
-    const githubLink = screen.getByText(/👨‍💻.*GitHub.*🚀/)
+    const githubLink = screen.getByText(/👨‍💻.*GitHub.*💻/)
     expect(githubLink).toBeInTheDocument()
   })
 })
