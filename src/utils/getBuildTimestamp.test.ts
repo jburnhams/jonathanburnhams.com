@@ -13,7 +13,7 @@ describe('getBuildTimestamp', () => {
   })
 
   it('returns the default timestamp when the value is not a non-empty string', () => {
-    ;(window as { __BUILD_INFO__?: unknown }).__BUILD_INFO__ = {
+    (window as { __BUILD_INFO__?: unknown }).__BUILD_INFO__ = {
       buildTimestamp: '',
     }
 
@@ -27,7 +27,7 @@ describe('getBuildTimestamp', () => {
   })
 
   it('returns the timestamp when provided with a valid string value', () => {
-    ;(window as { __BUILD_INFO__?: unknown }).__BUILD_INFO__ = {
+    (window as { __BUILD_INFO__?: unknown }).__BUILD_INFO__ = {
       buildTimestamp: '2024-06-15T12:30:45.000Z',
     }
 

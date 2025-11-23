@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import './Hero.css'
 
 /**
@@ -15,8 +16,11 @@ function Hero() {
         </h1>
         <div className="hero-underline" aria-hidden="true"></div>
         <div className="hero-links">
+          <Link to="/activities" className="hero-link">
+            🏃‍♂️ Strava Stats 🏃‍♀️
+          </Link>
           <a href="https://www.strava.com/athletes/jburnhams" target="_blank" rel="noopener noreferrer" className="hero-link">
-            🏃‍♂️ Strava 🏃‍♀️
+            🔗 Strava Profile
           </a>
           <a href="https://www.youtube.com/@JonathanBurnhams" target="_blank" rel="noopener noreferrer" className="hero-link">
             📹 YouTube 🎬

@@ -1,6 +1,7 @@
-import './App.css'
-import Hero from './components/Hero/Hero'
-import BuildTimestampBadge from './components/BuildTimestampBadge/BuildTimestampBadge'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import Activities from './pages/Activities';
+import './App.css';
 
 /**
  * Main application component
@@ -10,11 +11,15 @@ import BuildTimestampBadge from './components/BuildTimestampBadge/BuildTimestamp
  */
 function App() {
   return (
-    <div className="app">
-      <Hero />
-      <BuildTimestampBadge />
-    </div>
-  )
+    <BrowserRouter>
+      <div className="app">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/activities" element={<Activities />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
