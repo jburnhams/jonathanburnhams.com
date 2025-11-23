@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
+import { BrowserRouter } from 'react-router-dom'
 import Hero from './Hero'
 
 /**
@@ -10,19 +11,31 @@ import Hero from './Hero'
  */
 describe('Hero', () => {
   it('renders the component', () => {
-    render(<Hero />)
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
     const heroElement = screen.getByRole('banner')
     expect(heroElement).toBeInTheDocument()
   })
 
   it('displays the name "Jonathan Burnhams"', () => {
-    render(<Hero />)
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
     const nameElement = screen.getByText('Jonathan Burnhams')
     expect(nameElement).toBeInTheDocument()
   })
 
   it('has the correct structure', () => {
-    render(<Hero />)
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
     const heroSection = document.querySelector('.hero')
     expect(heroSection).toBeInTheDocument()
 
@@ -34,13 +47,21 @@ describe('Hero', () => {
   })
 
   it('includes an underline decoration', () => {
-    render(<Hero />)
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
     const underline = document.querySelector('.hero-underline')
     expect(underline).toBeInTheDocument()
   })
 
   it('uses semantic HTML with proper accessibility', () => {
-    const { container } = render(<Hero />)
+    const { container } = render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
     const section = container.querySelector('section')
     expect(section).toHaveAttribute('role', 'banner')
 
@@ -49,22 +70,35 @@ describe('Hero', () => {
   })
 
   it('renders the Strava link correctly', () => {
-    render(<Hero />)
-    const stravaLink = screen.getByText(/Strava/, { exact: false })
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
+    const stravaLink = screen.getByText('🔗 Strava Profile')
     expect(stravaLink).toBeInTheDocument()
     expect(stravaLink).toHaveAttribute('href', 'https://www.strava.com/athletes/jburnhams')
     expect(stravaLink).toHaveAttribute('target', '_blank')
     expect(stravaLink).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
-  it('includes runner emojis in the Strava link', () => {
-    render(<Hero />)
-    const stravaLink = screen.getByText(/🏃‍♂️.*Strava.*🏃‍♀️/)
-    expect(stravaLink).toBeInTheDocument()
+  it('renders the Strava Stats link correctly', () => {
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
+    const stravaStatsLink = screen.getByText(/Strava Stats/, { exact: false })
+    expect(stravaStatsLink).toBeInTheDocument()
+    expect(stravaStatsLink).toHaveAttribute('href', '/activities')
   })
 
   it('renders the YouTube link correctly', () => {
-    render(<Hero />)
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
     const youtubeLink = screen.getByText(/YouTube/, { exact: false })
     expect(youtubeLink).toBeInTheDocument()
     expect(youtubeLink).toHaveAttribute('href', 'https://www.youtube.com/@JonathanBurnhams')
@@ -73,13 +107,21 @@ describe('Hero', () => {
   })
 
   it('includes video emojis in the YouTube link', () => {
-    render(<Hero />)
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
     const youtubeLink = screen.getByText(/📹.*YouTube.*🎬/)
     expect(youtubeLink).toBeInTheDocument()
   })
 
   it('renders the GitHub link correctly', () => {
-    render(<Hero />)
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
     const githubLink = screen.getByText(/GitHub/, { exact: false })
     expect(githubLink).toBeInTheDocument()
     expect(githubLink).toHaveAttribute('href', 'https://github.com/jburnhams')
@@ -88,7 +130,11 @@ describe('Hero', () => {
   })
 
   it('includes developer and laptop emojis in the GitHub link', () => {
-    render(<Hero />)
+    render(
+      <BrowserRouter>
+        <Hero />
+      </BrowserRouter>
+    )
     const githubLink = screen.getByText(/👨‍💻.*GitHub.*💻/)
     expect(githubLink).toBeInTheDocument()
   })
