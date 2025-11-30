@@ -16,8 +16,8 @@ function Hero() {
         </h1>
         <div className="hero-underline" aria-hidden="true"></div>
         <div className="hero-links">
-          <Link to="/activities" className="hero-link">
-            🏃‍♂️ Strava Stats 🏃‍♀️
+          <Link to="/running" className="hero-link">
+            🏃‍♂️ Running 🏃‍♀️
           </Link>
           <a href="https://www.strava.com/athletes/jburnhams" target="_blank" rel="noopener noreferrer" className="hero-link">
             🔗 Strava Profile
@@ -34,4 +34,4 @@ function Hero() {
   )
 }
 
-export default Hero
+export default Hero;
