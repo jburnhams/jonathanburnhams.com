@@ -11,15 +11,16 @@
 .activities-table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  background: #2a2a2a; /* Dark grey background */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  color: #eee; /* Light text color */
 }
 
 .activities-table th,
 .activities-table td {
   padding: 1rem;
   text-align: left;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #444;
 }
 
 .activities-table tr {
@@ -27,8 +28,19 @@
   transition: background-color 0.2s;
 }
 
-.activities-table tr:hover {
-  background-color: #f8f9fa;
+/* Alternating dark and darker stripes */
+.activities-table tbody tr:nth-child(odd) {
+  background-color: #333;
+}
+
+.activities-table tbody tr:nth-child(even) {
+  background-color: #2a2a2a;
+}
+
+.activities-table tr:hover,
+.activities-table tbody tr:nth-child(odd):hover,
+.activities-table tbody tr:nth-child(even):hover {
+  background-color: #444;
 }
 
 .modal-overlay {
@@ -37,7 +49,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.8);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -46,7 +58,8 @@
 }
 
 .modal-content {
-  background: white;
+  background: #2a2a2a; /* Dark background for modal */
+  color: #eee; /* Light text for modal */
   border-radius: 8px;
   width: 100%;
   max-width: 900px;
@@ -55,11 +68,12 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
 
 .modal-header {
   padding: 1.5rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #444;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -72,6 +86,11 @@
   cursor: pointer;
   padding: 0.5rem;
   line-height: 1;
+  color: #eee; /* Ensure close button is visible */
+}
+
+.modal-close:hover {
+  color: #fff;
 }
 
 .modal-body {
@@ -93,7 +112,7 @@
 
 .stat-label {
   font-size: 0.875rem;
-  color: #666;
+  color: #aaa; /* Lighter grey for labels */
   margin-bottom: 0.25rem;
 }
 
@@ -105,7 +124,7 @@
 .map-container {
   height: 400px;
   width: 100%;
-  background: #f0f0f0;
+  background: #1a1a1a;
   border-radius: 4px;
   overflow: hidden;
 }
