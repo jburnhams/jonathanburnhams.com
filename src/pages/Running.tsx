@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Activity, StravaActivityJSON } from '../models/Activity';
+import { Activity, StravaActivityJSON, UnitSystem } from '../models/Activity';
 import './Running.css';
 
 // Component to fit map bounds to polyline
@@ -20,6 +20,7 @@ const Running = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -49,7 +50,23 @@ const Running = () => {
   return (
     <div className="running-page">
       <header className="running-header">
-        <h1>Running Activities</h1>
+        <div className="header-content">
+          <h1>Running Activities</h1>
+          <div className="unit-toggle">
+            <button
+              className={`toggle-btn ${unitSystem === 'metric' ? 'active' : ''}`}
+              onClick={() => setUnitSystem('metric')}
+            >
+              Metric
+            </button>
+            <button
+              className={`toggle-btn ${unitSystem === 'imperial' ? 'active' : ''}`}
+              onClick={() => setUnitSystem('imperial')}
+            >
+              Imperial
+            </button>
+          </div>
+        </div>
       </header>
 
       <table className="activities-table">
@@ -68,10 +85,10 @@ const Running = () => {
             <tr key={activity.id} onClick={() => setSelectedActivity(activity)}>
               <td>{activity.formattedDate}</td>
               <td>{activity.name}</td>
-              <td>{activity.formattedDistance}</td>
+              <td>{activity.getFormattedDistance(unitSystem)}</td>
               <td>{activity.formattedMovingTime}</td>
-              <td>{activity.formattedPace}</td>
-              <td>{activity.elevationGain}m</td>
+              <td>{activity.getFormattedPace(unitSystem)}</td>
+              <td>{activity.getFormattedElevation(unitSystem)}</td>
             </tr>
           ))}
         </tbody>
@@ -92,7 +109,7 @@ const Running = () => {
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Distance</span>
-                  <span className="stat-value">{selectedActivity.formattedDistance}</span>
+                  <span className="stat-value">{selectedActivity.getFormattedDistance(unitSystem)}</span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Moving Time</span>
@@ -100,11 +117,11 @@ const Running = () => {
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Pace</span>
-                  <span className="stat-value">{selectedActivity.formattedPace}</span>
+                  <span className="stat-value">{selectedActivity.getFormattedPace(unitSystem)}</span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Elevation Gain</span>
-                  <span className="stat-value">{selectedActivity.elevationGain}m</span>
+                  <span className="stat-value">{selectedActivity.getFormattedElevation(unitSystem)}</span>
                 </div>
               </div>
 

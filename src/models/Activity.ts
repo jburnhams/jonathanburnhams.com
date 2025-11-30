@@ -1,5 +1,7 @@
 import mapboxPolyline from '@mapbox/polyline';
 
+export type UnitSystem = 'metric' | 'imperial';
+
 export interface StravaActivityJSON {
   id: number;
   name: string;
@@ -74,8 +76,16 @@ export class Activity {
     }
   }
 
-  get formattedDistance(): string {
+  getFormattedDistance(system: UnitSystem = 'metric'): string {
+    if (system === 'imperial') {
+      const miles = this.distance * 0.000621371;
+      return miles.toFixed(2) + ' mi';
+    }
     return (this.distance / 1000).toFixed(2) + ' km';
+  }
+
+  get formattedDistance(): string {
+    return this.getFormattedDistance('metric');
   }
 
   get formattedMovingTime(): string {
@@ -89,12 +99,32 @@ export class Activity {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
+  getFormattedPace(system: UnitSystem = 'metric'): string {
+    if (this.averageSpeed === 0) return system === 'imperial' ? '0:00 /mi' : '0:00 /km';
+
+    let secondsPerUnit;
+    if (system === 'imperial') {
+      // 1 mile = 1609.344 meters
+      secondsPerUnit = 1609.344 / this.averageSpeed;
+    } else {
+      secondsPerUnit = 1000 / this.averageSpeed;
+    }
+
+    const minutes = Math.floor(secondsPerUnit / 60);
+    const seconds = Math.floor(secondsPerUnit % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')} /${system === 'imperial' ? 'mi' : 'km'}`;
+  }
+
   get formattedPace(): string {
-    if (this.averageSpeed === 0) return '0:00 /km';
-    const secondsPerKm = 1000 / this.averageSpeed;
-    const minutes = Math.floor(secondsPerKm / 60);
-    const seconds = Math.floor(secondsPerKm % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')} /km`;
+    return this.getFormattedPace('metric');
+  }
+
+  getFormattedElevation(system: UnitSystem = 'metric'): string {
+    if (system === 'imperial') {
+      const feet = this.elevationGain * 3.28084;
+      return Math.round(feet) + ' ft';
+    }
+    return Math.round(this.elevationGain) + ' m';
   }
 
   get formattedDate(): string {
