@@ -23,9 +23,13 @@ describe('hydrateBuildTimestampBadges', () => {
 
     hydrateBuildTimestampBadges()
 
-    expect(dateTimeFormatSpy).toHaveBeenCalledWith(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
+    expect(dateTimeFormatSpy).toHaveBeenCalledWith('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
     })
     expect(formatMock).toHaveBeenCalledTimes(1)
     expect(formatMock.mock.calls[0][0]).toEqual(new Date('2024-06-15T12:30:45.000Z'))

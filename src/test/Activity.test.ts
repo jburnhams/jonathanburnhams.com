@@ -83,8 +83,8 @@ describe('Activity Model', () => {
 
   it('should format date correctly', () => {
     const activity = new Activity(mockActivityData);
-    // Note: Locale date string format depends on environment, but should contain 2023
-    expect(activity.formattedDate).toContain('2023');
+    // Expect dd/mm/yyyy format
+    expect(activity.formattedDate).toBe('01/01/2023');
   });
 
   it('should handle missing data_json', () => {
