@@ -41,6 +41,7 @@ const Running = () => {
         const data: StravaActivityJSON[] = await response.json();
         const parsedActivities = data
           .map(item => new Activity(item))
+          .filter(activity => activity.type === 'Run' && activity.distance > 20000)
           .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
         setActivities(parsedActivities);
       } catch (err) {
