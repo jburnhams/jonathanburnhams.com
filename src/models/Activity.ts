@@ -43,7 +43,18 @@ export class Activity {
   constructor(data: StravaActivityJSON) {
     // Prefer data from data_json if available, as it seems richer based on user provided sample
     // Otherwise fall back to top level
-    const details = data.data_json || {};
+    const details = data.data_json || {
+        id: undefined,
+        name: undefined,
+        type: undefined,
+        start_date_local: undefined,
+        distance: undefined,
+        moving_time: undefined,
+        elapsed_time: undefined,
+        total_elevation_gain: undefined,
+        average_speed: undefined,
+        map: undefined
+    };
 
     this.id = details.id || data.id;
     this.name = details.name || data.name;
