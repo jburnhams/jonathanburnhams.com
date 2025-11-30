@@ -1,3 +1,4 @@
+import { formatDate } from '../utils/dateFormatter';
 import mapboxPolyline from '@mapbox/polyline';
 
 export type UnitSystem = 'metric' | 'imperial';
@@ -128,6 +129,6 @@ export class Activity {
   }
 
   get formattedDate(): string {
-    return this.startDate.toLocaleDateString();
+    return formatDate(this.startDate);
   }
 }

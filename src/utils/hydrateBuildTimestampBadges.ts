@@ -1,3 +1,4 @@
+import { formatDateTime } from './dateFormatter';
 const BUILD_TIMESTAMP_ATTRIBUTE = 'data-build-timestamp'
 const FALLBACK_TEXT = 'Build timestamp unavailable'
 
@@ -11,12 +12,7 @@ function formatTimestamp(rawValue: string | null) {
     return null
   }
 
-  const formatter = new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
-
-  return formatter.format(parsedDate)
+  return formatDateTime(parsedDate)
 }
 
 export function hydrateBuildTimestampBadges() {
