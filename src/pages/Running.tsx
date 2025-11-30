@@ -1,19 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Activity, StravaActivityJSON, UnitSystem } from '../models/Activity';
 import './Running.css';
 
 // Component to fit map bounds to polyline
-function FitBounds({ polyline }: { polyline: [number, number][] }) {
+function FitBounds({ polyline, bounds }: { polyline?: [number, number][], bounds?: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
-    if (polyline && polyline.length > 0) {
+    if (bounds && bounds.length > 0) {
+       map.fitBounds(bounds);
+    } else if (polyline && polyline.length > 0) {
       map.fitBounds(polyline);
     }
-  }, [map, polyline]);
+  }, [map, polyline, bounds]);
   return null;
 }
+
+const getColorForActivity = (id: number): string => {
+  // Simple hash function to generate a consistent color
+  const hash = id * 2654435761 % 2 ** 32;
+  const hue = hash % 360;
+  return `hsl(${hue}, 70%, 45%)`;
+};
 
 const Running = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -44,6 +53,25 @@ const Running = () => {
     fetchActivities();
   }, []);
 
+  const allPolylinesBounds = useMemo(() => {
+    const allPoints = activities.flatMap(a => a.polyline);
+    if (allPoints.length === 0) return undefined;
+
+    // Calculate bounds manually to avoid L dependency if possible, or just pass all points to fitBounds
+    // But fitBounds expects a LatLngBoundsExpression which can be an array of LatLngs.
+    // However, creating a huge array might be heavy. Let's find min/max.
+    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+
+    allPoints.forEach(([lat, lng]) => {
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+    });
+
+    return [[minLat, minLng], [maxLat, maxLng]] as [[number, number], [number, number]];
+  }, [activities]);
+
   if (loading) return <div className="running-page">Loading activities...</div>;
   if (error) return <div className="running-page">Error: {error}</div>;
 
@@ -68,6 +96,34 @@ const Running = () => {
           </div>
         </div>
       </header>
+
+      {/* Main Map with all activities */}
+      <div className="all-activities-map-container">
+         <MapContainer
+            bounds={allPolylinesBounds}
+            zoom={13}
+            scrollWheelZoom={false}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {activities.map(activity => (
+              activity.polyline.length > 0 && (
+                <Polyline
+                  key={activity.id}
+                  positions={activity.polyline}
+                  pathOptions={{ color: getColorForActivity(activity.id) }}
+                  eventHandlers={{
+                    click: () => setSelectedActivity(activity)
+                  }}
+                />
+              )
+            ))}
+            <FitBounds bounds={allPolylinesBounds} />
+          </MapContainer>
+      </div>
 
       <table className="activities-table">
         <thead>

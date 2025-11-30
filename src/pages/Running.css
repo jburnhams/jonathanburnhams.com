@@ -169,3 +169,15 @@
   height: 100%;
   width: 100%;
 }
+.all-activities-map-container {
+  width: 100%;
+  /* 16 / 9 = 1.777... so height is width / 1.777 */
+  /* Using aspect-ratio is modern and cleaner */
+  aspect-ratio: 16 / 9;
+  background: #1a1a1a;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 2rem;
+  /* Ensure it has a minimum height on very small screens? */
+  min-height: 300px;
+}
