@@ -42,8 +42,8 @@ describe('Running Page', () => {
       name: 'Test Run 1',
       type: 'Run',
       start_date: '2023-01-01T10:00:00Z',
-      distance: 5000,
-      moving_time: 1800,
+      distance: 25000,
+      moving_time: 7200,
       total_elevation_gain: 50,
       average_speed: 2.77,
       data_json: {
@@ -51,8 +51,8 @@ describe('Running Page', () => {
         name: 'Test Run 1',
         type: 'Run',
         start_date_local: '2023-01-01T10:00:00Z',
-        distance: 5000,
-        moving_time: 1800,
+        distance: 25000,
+        moving_time: 7200,
         total_elevation_gain: 50,
         average_speed: 2.77,
         map: { summary_polyline: 'encoded_polyline' } // This will be decoded by mapboxPolyline
@@ -63,8 +63,8 @@ describe('Running Page', () => {
       name: 'Test Run 2',
       type: 'Run',
       start_date: '2023-01-02T10:00:00Z',
-      distance: 10000,
-      moving_time: 3600,
+      distance: 30000,
+      moving_time: 9000,
       total_elevation_gain: 100,
       average_speed: 2.77,
       data_json: {
@@ -72,8 +72,8 @@ describe('Running Page', () => {
         name: 'Test Run 2',
         type: 'Run',
         start_date_local: '2023-01-02T10:00:00Z',
-        distance: 10000,
-        moving_time: 3600,
+        distance: 30000,
+        moving_time: 9000,
         total_elevation_gain: 100,
         average_speed: 2.77,
         map: { summary_polyline: 'encoded_polyline_2' }
@@ -106,7 +106,7 @@ describe('Running Page', () => {
       expect(screen.getByText('Test Run 1')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('5.00 km')).toBeInTheDocument();
+    expect(screen.getByText('25.00 km')).toBeInTheDocument();
   });
 
   it('renders the all-activities map', async () => {
