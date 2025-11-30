@@ -82,15 +82,15 @@ describe('Hero', () => {
     expect(stravaLink).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
-  it('renders the Strava Stats link correctly', () => {
+  it('renders the Running link correctly', () => {
     render(
       <BrowserRouter>
         <Hero />
       </BrowserRouter>
     )
-    const stravaStatsLink = screen.getByText(/Strava Stats/, { exact: false })
-    expect(stravaStatsLink).toBeInTheDocument()
-    expect(stravaStatsLink).toHaveAttribute('href', '/activities')
+    const runningLink = screen.getByText(/Running/, { exact: false })
+    expect(runningLink).toBeInTheDocument()
+    expect(runningLink).toHaveAttribute('href', '/running')
   })
 
   it('renders the YouTube link correctly', () => {
