@@ -97,7 +97,9 @@ const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: s
     getSummary({ period, from: range.from, to: range.to, ...raceParam }).then(setChartRows).catch(fail);
   }, [period, range, raceParam, fail]);
 
-  // The session list's filters as API parameters
+  // The session list's filters as API parameters (the chart view only matters while a bar is selected)
+  const barFilter = selectedPeriod ? periodRange(period, selectedPeriod) : null;
+  const barFrom = barFilter?.from, barTo = barFilter?.to;
   const listParams = useMemo(() => {
     const p: Record<string, string> = { limit: String(PAGE) };
     if (groupFilter !== 'all') p.sport = groupSports(groupFilter);
@@ -105,15 +107,14 @@ const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: s
     else if (!includeRaces) p.race = '0';
     let from = yearFilter === 'all' ? '' : `${yearFilter}-01-01`;
     let to = yearFilter === 'all' ? '' : `${yearFilter}-12-31`;
-    if (selectedPeriod) {
-      const r = periodRange(period, selectedPeriod);
-      if (!from || r.from > from) from = r.from;
-      if (!to || r.to < to) to = r.to;
+    if (barFrom && barTo) {
+      if (!from || barFrom > from) from = barFrom;
+      if (!to || barTo < to) to = barTo;
     }
     if (from) p.from = from;
     if (to) p.to = to;
     return p;
-  }, [groupFilter, racesOnly, includeRaces, yearFilter, selectedPeriod, period]);
+  }, [groupFilter, racesOnly, includeRaces, yearFilter, barFrom, barTo]);
 
   // One page of sessions; offset 0 replaces the list, later pages are appended
   const fetchPage = useCallback(async (offset: number) => {

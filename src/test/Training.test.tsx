@@ -131,6 +131,9 @@ describe('Training page', () => {
     expect(params('/summary')).toEqual([{ period: 'year' }, { period: 'week', from: '2025-11-03', to: TODAY }]);
     expect(params('/activities')).toEqual([{ limit: '50', offset: '0' }]);
     expect(requests.some(r => r.includes('period=month'))).toBe(false);
+    fireEvent.click(screen.getByText('Monthly'));
+    await waitFor(() => expect(requests.some(r => r.includes('period=month'))).toBe(true));
+    expect(params('/activities')).toHaveLength(1); // the list doesn't depend on the chart view
     const totals = screen.getByRole('heading', { name: 'Totals by year' }).nextElementSibling as HTMLElement;
     expect(within(totals).getByText('2025')).toBeInTheDocument();
   });
