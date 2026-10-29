@@ -1,22 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import { MapContainer, TileLayer, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Activity, ActivityPhoto, StravaActivityJSON, UnitSystem } from '../models/Activity';
+import { Activity, StravaActivityJSON, UnitSystem } from '../models/Activity';
+import { ActivityModal, FitBounds } from '../components/ActivityModal/ActivityModal';
 import './Running.css';
-
-// Component to fit map bounds to polyline
-function FitBounds({ polyline, bounds }: { polyline?: [number, number][], bounds?: [number, number][] }) {
-  const map = useMap();
-  useEffect(() => {
-    if (bounds && bounds.length > 0) {
-       map.fitBounds(bounds);
-    } else if (polyline && polyline.length > 0) {
-      map.fitBounds(polyline);
-    }
-  }, [map, polyline, bounds]);
-  return null;
-}
 
 const getColorForActivity = (id: number): string => {
   // Simple hash function to generate a consistent color
@@ -25,57 +12,12 @@ const getColorForActivity = (id: number): string => {
   return `hsl(${hue}, 70%, 45%)`;
 };
 
-// A few arrowheads along the route showing the direction of travel, in the route's colour
-function DirectionArrows({ activity, color }: { activity: Activity; color: string }) {
-  return (
-    <>
-      {activity.directionArrows().map(({ position, bearing }, i) => (
-        <Marker
-          key={i}
-          position={position}
-          interactive={false}
-          icon={L.divIcon({
-            className: 'route-arrow',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12],
-            html: `<svg width="24" height="24" viewBox="0 0 16 16" style="transform: rotate(${bearing.toFixed(0)}deg)"><path d="M8 1 L14.5 14.5 L8 11 L1.5 14.5 Z" fill="${color}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
-          })}
-        />
-      ))}
-    </>
-  );
-}
-
-// Start (filled green) and finish (red ring); one combined marker for loops.
-function StartFinishMarkers({ activity }: { activity: Activity }) {
-  const ends = activity.startFinish;
-  if (!ends) return null;
-  if (ends.loop) {
-    return (
-      <CircleMarker center={ends.start} radius={7} pathOptions={{ color: '#d32f2f', weight: 3, fillColor: '#2e7d32', fillOpacity: 1 }}>
-        <Tooltip>Start / Finish</Tooltip>
-      </CircleMarker>
-    );
-  }
-  return (
-    <>
-      <CircleMarker center={ends.finish} radius={7} pathOptions={{ color: '#d32f2f', weight: 3, fillColor: '#fff', fillOpacity: 1 }}>
-        <Tooltip>Finish</Tooltip>
-      </CircleMarker>
-      <CircleMarker center={ends.start} radius={7} pathOptions={{ color: '#fff', weight: 2, fillColor: '#2e7d32', fillOpacity: 1 }}>
-        <Tooltip>Start</Tooltip>
-      </CircleMarker>
-    </>
-  );
-}
-
 const Running = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
-  const [openPhoto, setOpenPhoto] = useState<ActivityPhoto | null>(null);
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -198,95 +140,7 @@ const Running = () => {
       </table>
 
       {selectedActivity && (
-        <div className="modal-overlay" onClick={() => { setOpenPhoto(null); setSelectedActivity(null); }}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{selectedActivity.name}</h2>
-              <button className="modal-close" onClick={() => { setOpenPhoto(null); setSelectedActivity(null); }}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="activity-stats">
-                <div className="stat-item">
-                  <span className="stat-label">Date</span>
-                  <span className="stat-value">{selectedActivity.formattedDate}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Distance</span>
-                  <span className="stat-value">{selectedActivity.getFormattedDistance(unitSystem)}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Moving Time</span>
-                  <span className="stat-value">{selectedActivity.formattedMovingTime}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Pace</span>
-                  <span className="stat-value">{selectedActivity.getFormattedPace(unitSystem)}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Elevation Gain</span>
-                  <span className="stat-value">{selectedActivity.getFormattedElevation(unitSystem)}</span>
-                </div>
-              </div>
-
-              {selectedActivity.description && (
-                <p className="activity-description">{selectedActivity.description}</p>
-              )}
-
-              {selectedActivity.photos.length > 0 && (
-                <div className="activity-photos">
-                  {selectedActivity.photos.map(photo => (
-                    <button
-                      key={photo.id}
-                      type="button"
-                      className="activity-photo-thumb"
-                      onClick={() => setOpenPhoto(photo)}
-                    >
-                      <img
-                        src={photo.thumb_url}
-                        alt={photo.caption || selectedActivity.name}
-                        loading="lazy"
-                        width={400}
-                        height={Math.round((400 * photo.height) / photo.width) || undefined}
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {selectedActivity.polyline.length > 0 ? (
-                <div className="map-container">
-                  <MapContainer
-                    center={selectedActivity.polyline[0]}
-                    zoom={13}
-                    scrollWheelZoom={false}
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <Polyline positions={selectedActivity.polyline} color="blue" />
-                    <DirectionArrows activity={selectedActivity} color="blue" />
-                    <StartFinishMarkers activity={selectedActivity} />
-                    <FitBounds polyline={selectedActivity.polyline} />
-                  </MapContainer>
-                </div>
-              ) : (
-                <div className="map-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  No map data available
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {openPhoto && (
-        <div className="photo-lightbox" onClick={() => setOpenPhoto(null)}>
-          <img src={openPhoto.url} alt={openPhoto.caption || selectedActivity?.name || ''} />
-          {openPhoto.caption && <p className="photo-caption">{openPhoto.caption}</p>}
-          <button className="modal-close photo-lightbox-close" onClick={() => setOpenPhoto(null)}>×</button>
-        </div>
+        <ActivityModal activity={selectedActivity} unitSystem={unitSystem} onClose={() => setSelectedActivity(null)} />
       )}
     </div>
   );

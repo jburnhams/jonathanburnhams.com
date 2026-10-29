@@ -11,6 +11,7 @@ export interface TrainingActivity {
   elapsed_time: number | null;
   elevation_gain: number | null; // metres
   race?: number; // 1 when it was (part of) a race
+  race_activity_id?: number | null; // that race's Strava activity id (strava-sync /api/users/:id/activities)
 }
 
 export interface TrainingPeriod {
@@ -88,10 +89,21 @@ export function formatPace(a: TrainingActivity): string {
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')} /${group === 'swim' ? '100m' : 'km'}`;
 }
 
-export function periodLabel(period: string, kind: Period): string {
+// Whether a day (YYYY-MM-DD) falls in a chart period: a week (its Monday), a month (YYYY-MM) or a year
+export function inPeriod(day: string, kind: Period, period: string): boolean {
+  if (kind !== 'week') return day.startsWith(period);
+  const start = Date.parse(`${period}T00:00:00Z`);
+  const t = Date.parse(`${day}T00:00:00Z`);
+  return t >= start && t < start + 7 * 86400000;
+}
+
+export function periodLabel(period: string, kind: Period, long = false): string {
   if (kind === 'year') return period;
+  if (kind === 'month' && long) return new Date(`${period}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   const d = new Date(kind === 'month' ? `${period}-01T00:00:00Z` : `${period}T00:00:00Z`);
   return kind === 'month'
     ? d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+    : long
+    ? `week of ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`
     : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
