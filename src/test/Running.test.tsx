@@ -22,6 +22,11 @@ vi.mock('react-leaflet', () => {
     MapContainer: MockMapContainer,
     TileLayer: () => <div data-testid="tile-layer" />,
     Polyline: MockPolyline,
+    CircleMarker: ({ children, center }: { children?: React.ReactNode, center: [number, number] }) => (
+      <div data-testid="circle-marker" data-center={JSON.stringify(center)}>{children}</div>
+    ),
+    Marker: ({ icon }: { icon?: { options?: { className?: string } } }) => <div data-testid={icon?.options?.className ?? 'marker'} />,
+    Tooltip: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
     useMap: () => ({
       fitBounds: vi.fn(),
     }),
@@ -205,5 +210,16 @@ describe('Running Page', () => {
     fireEvent.click(thumb);
     const large = screen.getAllByRole('img', { name: 'Test Run 1' }).find(img => img.getAttribute('src') === 'https://x/api/photos/1_0');
     expect(large).toBeDefined();
+  });
+
+  it('marks the start and finish on the activity map', async () => {
+    (global.fetch as any).mockResolvedValue({ ok: true, json: async () => mockActivities });
+    render(<Running />);
+    fireEvent.click(await screen.findByText('Test Run 1'));
+    // mapbox polyline decodes the mock strings to distinct points, so this is not a loop
+    await screen.findByText('Start');
+    expect(screen.getByText('Finish')).toBeInTheDocument();
+    expect(screen.getAllByTestId('circle-marker')).toHaveLength(2);
+    expect(screen.getAllByTestId('route-arrow')).toHaveLength(5);
   });
 });

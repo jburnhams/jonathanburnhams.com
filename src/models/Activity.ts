@@ -95,6 +95,39 @@ export class Activity {
     }
   }
 
+  // First and last points of the summary polyline (Strava's privacy zones are
+  // already trimmed off it); null when there is no route. Within 50 m counts as a loop.
+  get startFinish(): { start: [number, number]; finish: [number, number]; loop: boolean } | null {
+    if (this.polyline.length === 0) return null;
+    const start = this.polyline[0];
+    const finish = this.polyline[this.polyline.length - 1];
+    return { start, finish, loop: distanceMeters(start, finish) <= 50 };
+  }
+
+  // `count` points evenly spaced by distance along the route (ends skipped), each
+  // with the direction of travel there in degrees clockwise from north.
+  directionArrows(count = 5): { position: [number, number]; bearing: number }[] {
+    const pts = this.polyline;
+    if (pts.length < 2) return [];
+    const cumulative = [0];
+    for (let i = 1; i < pts.length; i++) cumulative.push(cumulative[i - 1] + distanceMeters(pts[i - 1], pts[i]));
+    const total = cumulative[cumulative.length - 1];
+    if (total === 0) return [];
+    const arrows: { position: [number, number]; bearing: number }[] = [];
+    let seg = 1;
+    for (let k = 1; k <= count; k++) {
+      const target = (total * k) / (count + 1);
+      while (seg < pts.length - 1 && cumulative[seg] < target) seg++;
+      const [a, b] = [pts[seg - 1], pts[seg]];
+      const t = (target - cumulative[seg - 1]) / ((cumulative[seg] - cumulative[seg - 1]) || 1);
+      arrows.push({
+        position: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
+        bearing: bearingDegrees(a, b),
+      });
+    }
+    return arrows;
+  }
+
   getFormattedDistance(system: UnitSystem = 'metric'): string {
     if (system === 'imperial') {
       const miles = this.distance * 0.000621371;
@@ -149,4 +182,19 @@ export class Activity {
   get formattedDate(): string {
     return formatDate(this.startDate);
   }
+}
+
+// Haversine distance between two [lat, lng] points
+export function distanceMeters([lat1, lng1]: [number, number], [lat2, lng2]: [number, number]): number {
+  const rad = Math.PI / 180;
+  const a = Math.sin(((lat2 - lat1) * rad) / 2) ** 2 +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lng2 - lng1) * rad) / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(a));
+}
+
+// Direction from a to b on the map, degrees clockwise from north (flat approximation, fine between neighbouring points)
+export function bearingDegrees([lat1, lng1]: [number, number], [lat2, lng2]: [number, number]): number {
+  const dx = (lng2 - lng1) * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180);
+  const dy = lat2 - lat1;
+  return ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
 }

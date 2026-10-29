@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Activity } from '../models/Activity';
+import { Activity, bearingDegrees, distanceMeters } from '../models/Activity';
 
 describe('Activity Model', () => {
   const mockActivityData = {
@@ -118,5 +118,32 @@ describe('Activity Model', () => {
     const activity = new Activity(mockActivityData);
     expect(activity.description).toBe('');
     expect(activity.photos).toEqual([]);
+  });
+
+  it('gives the start and finish of the route, and spots loops', () => {
+    const route = (points: [number, number][]) => {
+      const a = new Activity(mockActivityData);
+      a.polyline = points;
+      return a.startFinish;
+    };
+    expect(route([])).toBeNull();
+    expect(route([[51.5, -0.1], [51.6, -0.2]])).toEqual({ start: [51.5, -0.1], finish: [51.6, -0.2], loop: false });
+    expect(route([[51.5, -0.1], [51.6, -0.2], [51.5003, -0.1]])?.loop).toBe(true); // ~33 m apart
+    expect(distanceMeters([51.5, -0.1], [51.5, -0.1])).toBe(0);
+    expect(Math.round(distanceMeters([0, 0], [1, 0]) / 1000)).toBe(111);
+  });
+
+  it('places direction arrows evenly along the route, pointing the way it goes', () => {
+    const a = new Activity(mockActivityData);
+    a.polyline = [[51.5, -0.1], [51.6, -0.1], [51.6, 0.06]]; // north ~11 km, then east ~11 km
+    const arrows = a.directionArrows(3);
+    expect(arrows).toHaveLength(3);
+    expect(Math.round(arrows[0].bearing)).toBe(0);   // first quarter: heading north
+    expect(Math.round(arrows[2].bearing)).toBe(90);  // last quarter: heading east
+    expect(arrows[0].position[0]).toBeGreaterThan(51.5);
+    expect(arrows[2].position[1]).toBeGreaterThan(-0.1);
+    expect(Math.round(bearingDegrees([0, 0], [0, -1]))).toBe(270);
+    a.polyline = [[51.5, -0.1]];
+    expect(a.directionArrows()).toEqual([]);
   });
 });

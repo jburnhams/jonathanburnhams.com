@@ -216,6 +216,11 @@
   right: 1rem;
 }
 
+.route-arrow {
+  background: none;
+  border: none;
+}
+
 .map-container {
   height: 400px;
   width: 100%;

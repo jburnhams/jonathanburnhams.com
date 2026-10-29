@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Activity, ActivityPhoto, StravaActivityJSON, UnitSystem } from '../models/Activity';
 import './Running.css';
@@ -23,6 +24,50 @@ const getColorForActivity = (id: number): string => {
   const hue = hash % 360;
   return `hsl(${hue}, 70%, 45%)`;
 };
+
+// A few arrowheads along the route showing the direction of travel, in the route's colour
+function DirectionArrows({ activity, color }: { activity: Activity; color: string }) {
+  return (
+    <>
+      {activity.directionArrows().map(({ position, bearing }, i) => (
+        <Marker
+          key={i}
+          position={position}
+          interactive={false}
+          icon={L.divIcon({
+            className: 'route-arrow',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
+            html: `<svg width="16" height="16" viewBox="0 0 16 16" style="transform: rotate(${bearing.toFixed(0)}deg)"><path d="M8 1 L14 14 L8 10.5 L2 14 Z" fill="${color}" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
+          })}
+        />
+      ))}
+    </>
+  );
+}
+
+// Start (filled green) and finish (red ring); one combined marker for loops.
+function StartFinishMarkers({ activity }: { activity: Activity }) {
+  const ends = activity.startFinish;
+  if (!ends) return null;
+  if (ends.loop) {
+    return (
+      <CircleMarker center={ends.start} radius={7} pathOptions={{ color: '#d32f2f', weight: 3, fillColor: '#2e7d32', fillOpacity: 1 }}>
+        <Tooltip>Start / Finish</Tooltip>
+      </CircleMarker>
+    );
+  }
+  return (
+    <>
+      <CircleMarker center={ends.finish} radius={7} pathOptions={{ color: '#d32f2f', weight: 3, fillColor: '#fff', fillOpacity: 1 }}>
+        <Tooltip>Finish</Tooltip>
+      </CircleMarker>
+      <CircleMarker center={ends.start} radius={7} pathOptions={{ color: '#fff', weight: 2, fillColor: '#2e7d32', fillOpacity: 1 }}>
+        <Tooltip>Start</Tooltip>
+      </CircleMarker>
+    </>
+  );
+}
 
 const Running = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -221,6 +266,8 @@ const Running = () => {
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
                     <Polyline positions={selectedActivity.polyline} color="blue" />
+                    <DirectionArrows activity={selectedActivity} color="blue" />
+                    <StartFinishMarkers activity={selectedActivity} />
                     <FitBounds polyline={selectedActivity.polyline} />
                   </MapContainer>
                 </div>
