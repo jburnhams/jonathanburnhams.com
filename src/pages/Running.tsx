@@ -36,9 +36,9 @@ function DirectionArrows({ activity, color }: { activity: Activity; color: strin
           interactive={false}
           icon={L.divIcon({
             className: 'route-arrow',
-            iconSize: [16, 16],
-            iconAnchor: [8, 8],
-            html: `<svg width="16" height="16" viewBox="0 0 16 16" style="transform: rotate(${bearing.toFixed(0)}deg)"><path d="M8 1 L14 14 L8 10.5 L2 14 Z" fill="${color}" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+            html: `<svg width="24" height="24" viewBox="0 0 16 16" style="transform: rotate(${bearing.toFixed(0)}deg)"><path d="M8 1 L14.5 14.5 L8 11 L1.5 14.5 Z" fill="${color}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
           })}
         />
       ))}
