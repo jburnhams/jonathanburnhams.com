@@ -138,4 +138,10 @@ describe('Hero', () => {
     const githubLink = screen.getByText(/👨‍💻.*GitHub.*💻/)
     expect(githubLink).toBeInTheDocument()
   })
+
+  it('renders the Training link correctly', () => {
+    render(<BrowserRouter><Hero /></BrowserRouter>)
+    const link = screen.getByText(/Training/)
+    expect(link.closest('a')).toHaveAttribute('href', '/training')
+  })
 })
