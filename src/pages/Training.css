@@ -25,6 +25,7 @@
   gap: 0.5rem;
 }
 
+.chart-range,
 .training-filters select {
   background: #333;
   color: #eee;

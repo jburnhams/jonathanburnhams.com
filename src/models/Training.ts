@@ -107,3 +107,58 @@ export function periodLabel(period: string, kind: Period, long = false): string 
     ? `week of ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`
     : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
+
+const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+const DAY = 86400000;
+
+export function mondayOf(day: string): string {
+  const t = Date.parse(`${day}T00:00:00Z`);
+  return iso(t - ((new Date(t).getUTCDay() + 6) % 7) * DAY);
+}
+
+// First and last day (YYYY-MM-DD) of a chart period: a week (its Monday), a month (YYYY-MM) or a year (YYYY)
+export function periodRange(kind: Period, period: string): { from: string; to: string } {
+  if (kind === 'year') return { from: `${period}-01-01`, to: `${period}-12-31` };
+  if (kind === 'month') {
+    const [y, m] = period.split('-').map(Number);
+    return { from: `${period}-01`, to: iso(Date.UTC(y, m, 1) - DAY) };
+  }
+  return { from: period, to: iso(Date.parse(`${period}T00:00:00Z`) + 6 * DAY) };
+}
+
+// The chart's range: 'recent' is the last 12 months of weeks or the last 2 years of months, or a calendar year.
+// Summary from/to select weeks by their Monday.
+export function chartRange(kind: 'week' | 'month', choice: string, today: string): { from: string; to: string } {
+  if (choice !== 'recent') return { from: `${choice}-01-01`, to: `${choice}-12-31` };
+  const t = Date.parse(`${today}T00:00:00Z`);
+  if (kind === 'week') return { from: mondayOf(iso(t - 51 * 7 * DAY)), to: today };
+  const d = new Date(t);
+  return { from: iso(Date.UTC(d.getUTCFullYear() - 2, d.getUTCMonth() + 1, 1)), to: today };
+}
+
+// Every period key in a range, oldest first, so empty weeks or months still get a slot on the chart
+export function periodsIn(kind: 'week' | 'month', from: string, to: string): string[] {
+  const out: string[] = [];
+  if (kind === 'week') {
+    // Weeks are keyed by Monday and selected by it, so start at the first Monday on or after `from`
+    let t = Date.parse(`${mondayOf(from)}T00:00:00Z`);
+    if (iso(t) < from) t += 7 * DAY;
+    for (; t <= Date.parse(`${to}T00:00:00Z`); t += 7 * DAY) out.push(iso(t));
+    return out;
+  }
+  let [y, m] = from.slice(0, 7).split('-').map(Number);
+  const end = to.slice(0, 7);
+  for (;;) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    if (key > end) break;
+    out.push(key);
+    if (++m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+
+// API sport parameter for a sport group ('other' has no fixed list)
+export function groupSports(group: string): string {
+  const g = SPORT_GROUPS.find(s => s.key === group);
+  return g && g.sports.length ? g.sports.join(',') : 'other';
+}

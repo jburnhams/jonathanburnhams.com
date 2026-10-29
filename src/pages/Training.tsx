@@ -1,31 +1,28 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Period, PeriodTotals, SPORT_GROUPS, TRAINING_API, TrainingActivity, TrainingPeriod,
-  formatDuration, formatKm, formatPace, inPeriod, periodLabel, sportGroup, sportLabel, totalsByPeriod,
+  chartRange, formatDuration, formatKm, formatPace, groupSports, periodLabel, periodRange, periodsIn,
+  sportGroup, sportLabel, totalsByPeriod,
 } from '../models/Training';
 import { Activity, StravaActivityJSON } from '../models/Activity';
 import { ActivityModal } from '../components/ActivityModal/ActivityModal';
+import { getJson, getSummary } from '../utils/trainingApi';
 import './Running.css';
 import './Training.css';
 
 type Metric = 'distance' | 'moving_time';
-const BARS: Record<Period, number> = { week: 52, month: 36, year: 20 };
-const PAGE = 100;
+const PAGE = 50;
 const STRAVA_ACTIVITIES = 'https://stravasync.jonathanburnhams.com/api/users/7828229/activities';
 const PERIODS: Period[] = ['week', 'month', 'year'];
-type Summaries = Record<Period, TrainingPeriod[]>;
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to fetch training data');
-  return res.json();
-}
+const RECENT_LABEL: Record<'week' | 'month', string> = { week: 'Last 12 months', month: 'Last 2 years' };
 
 // Stacked bars per period (oldest left), one colour per sport group; click a bar to pick that period
-function VolumeChart({ totals, period, metric, selected, onSelect }: {
-  totals: PeriodTotals[]; period: Period; metric: Metric; selected: string | null; onSelect: (period: string) => void;
+function VolumeChart({ periods, totals, period, metric, selected, onSelect }: {
+  periods: string[]; totals: PeriodTotals[]; period: Period; metric: Metric;
+  selected: string | null; onSelect: (period: string) => void;
 }) {
-  const bars = totals.slice(0, BARS[period]).reverse();
+  const byPeriod = new Map(totals.map(t => [t.period, t]));
+  const bars = periods.map(p => byPeriod.get(p) ?? { period: p, byGroup: {} });
   const value = (t: PeriodTotals, g: string) => t.byGroup[g]?.[metric] ?? 0;
   const max = Math.max(1, ...bars.map(t => SPORT_GROUPS.reduce((s, g) => s + value(t, g.key), 0)));
   const width = 900, height = 220, gap = 2;
@@ -46,7 +43,7 @@ function VolumeChart({ totals, period, metric, selected, onSelect }: {
             onClick={() => onSelect(t.period)}
           >
             <rect x={i * barW} y={0} width={barW} height={height} fill="transparent" />
-            <title>{`${periodLabel(t.period, period)}: ${SPORT_GROUPS.filter(g => value(t, g.key)).map(g => `${g.label} ${fmt(value(t, g.key))}`).join(', ')}`}</title>
+            <title>{`${periodLabel(t.period, period)}: ${SPORT_GROUPS.filter(g => value(t, g.key)).map(g => `${g.label} ${fmt(value(t, g.key))}`).join(', ') || 'nothing'}`}</title>
             {SPORT_GROUPS.map(g => {
               const h = (value(t, g.key) / max) * (height - 20);
               if (!h) return null;
@@ -63,59 +60,94 @@ function VolumeChart({ totals, period, metric, selected, onSelect }: {
   );
 }
 
-const Training = () => {
-  // Summaries with races (all) and without (race=0), loaded together
-  const [summary, setSummary] = useState<{ all: Summaries; training: Summaries }>({
-    all: { week: [], month: [], year: [] }, training: { week: [], month: [], year: [] },
-  });
-  const [activities, setActivities] = useState<TrainingActivity[]>([]);
-  const [loading, setLoading] = useState(true);
+const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: string }) => {
+  const [yearly, setYearly] = useState<TrainingPeriod[] | null>(null);
+  const [chartRows, setChartRows] = useState<TrainingPeriod[]>([]);
+  const [sessions, setSessions] = useState<TrainingActivity[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loadingSessions, setLoadingSessions] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>('week');
+  const [chartYear, setChartYear] = useState<Record<'week' | 'month', string>>({ week: 'recent', month: 'recent' });
   const [metric, setMetric] = useState<Metric>('distance');
   const [includeRaces, setIncludeRaces] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [groupFilter, setGroupFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
   const [racesOnly, setRacesOnly] = useState(false);
-  const [shown, setShown] = useState(PAGE);
   const [races, setRaces] = useState<Map<number, Activity> | null>(null);
   const [openRace, setOpenRace] = useState<Activity | null>(null);
+  const request = useRef(0);
 
+  const raceParam = useMemo((): Record<string, string> => (includeRaces ? {} : { race: '0' }), [includeRaces]);
+  const fail = useCallback((err: unknown) => setError(err instanceof Error ? err.message : 'An error occurred'), []);
+
+  // Yearly totals (all years): the totals table, the Yearly chart and the year selectors
   useEffect(() => {
-    Promise.all([
-      ...PERIODS.map(p => getJson<TrainingPeriod[]>(`${TRAINING_API}/summary?period=${p}`)),
-      ...PERIODS.map(p => getJson<TrainingPeriod[]>(`${TRAINING_API}/summary?period=${p}&race=0`)),
-      getJson<TrainingActivity[]>(`${TRAINING_API}/activities`),
-    ])
-      .then(results => {
-        const [w, m, y, tw, tm, ty] = results.slice(0, 6) as TrainingPeriod[][];
-        const acts = results[6] as TrainingActivity[];
-        setSummary({ all: { week: w, month: m, year: y }, training: { week: tw, month: tm, year: ty } });
-        setActivities(acts);
-      })
-      .catch(err => setError(err instanceof Error ? err.message : 'An error occurred'))
-      .finally(() => setLoading(false));
-  }, []);
+    getSummary({ period: 'year', ...raceParam }).then(setYearly).catch(fail);
+  }, [raceParam, fail]);
 
-  const shownSummary = includeRaces ? summary.all : summary.training;
-  const totals = useMemo(() => totalsByPeriod(shownSummary[period]), [shownSummary, period]);
-  const yearly = useMemo(() => totalsByPeriod(shownSummary.year), [shownSummary]);
-  const years = useMemo(() => [...new Set(activities.map(a => a.date.slice(0, 4)))].sort().reverse(), [activities]);
-  const filtered = useMemo(
-    () => activities.filter(a =>
-      (groupFilter === 'all' || sportGroup(a.sport).key === groupFilter) &&
-      (yearFilter === 'all' || a.date.startsWith(yearFilter)) &&
-      (!selectedPeriod || inPeriod(a.date, period, selectedPeriod)) &&
-      (includeRaces || a.race !== 1) &&
-      (!racesOnly || a.race === 1)),
-    [activities, groupFilter, yearFilter, selectedPeriod, period, includeRaces, racesOnly]
+  // Weekly or monthly bars for the chosen range, fetched when first shown
+  const range = useMemo(
+    () => (period === 'year' ? null : chartRange(period, chartYear[period], today)),
+    [period, chartYear, today]
   );
+  useEffect(() => {
+    if (!range) return;
+    getSummary({ period, from: range.from, to: range.to, ...raceParam }).then(setChartRows).catch(fail);
+  }, [period, range, raceParam, fail]);
 
-  const choosePeriod = (p: Period) => { setPeriod(p); setSelectedPeriod(null); setShown(PAGE); };
+  // The session list's filters as API parameters
+  const listParams = useMemo(() => {
+    const p: Record<string, string> = { limit: String(PAGE) };
+    if (groupFilter !== 'all') p.sport = groupSports(groupFilter);
+    if (racesOnly) p.race = '1';
+    else if (!includeRaces) p.race = '0';
+    let from = yearFilter === 'all' ? '' : `${yearFilter}-01-01`;
+    let to = yearFilter === 'all' ? '' : `${yearFilter}-12-31`;
+    if (selectedPeriod) {
+      const r = periodRange(period, selectedPeriod);
+      if (!from || r.from > from) from = r.from;
+      if (!to || r.to < to) to = r.to;
+    }
+    if (from) p.from = from;
+    if (to) p.to = to;
+    return p;
+  }, [groupFilter, racesOnly, includeRaces, yearFilter, selectedPeriod, period]);
+
+  // One page of sessions; offset 0 replaces the list, later pages are appended
+  const fetchPage = useCallback(async (offset: number) => {
+    const id = ++request.current;
+    setLoadingSessions(true);
+    try {
+      const res = await fetch(`${TRAINING_API}/activities?${new URLSearchParams({ ...listParams, offset: String(offset) })}`);
+      if (!res.ok) throw new Error('Failed to fetch training data');
+      const page: TrainingActivity[] = await res.json();
+      if (id !== request.current) return; // the filters changed meanwhile
+      setTotal(Number(res.headers.get('X-Total-Count') ?? page.length));
+      setSessions(current => (offset === 0 ? page : [...current, ...page]));
+    } catch (err) {
+      if (id === request.current) fail(err);
+    } finally {
+      if (id === request.current) setLoadingSessions(false);
+    }
+  }, [listParams, fail]);
+
+  useEffect(() => { fetchPage(0); }, [fetchPage]);
+
+  const yearlyTotals = useMemo(() => totalsByPeriod(yearly ?? []), [yearly]);
+  const years = useMemo(() => yearlyTotals.map(y => y.period), [yearlyTotals]);
+  const chartTotals = period === 'year' ? yearlyTotals : totalsByPeriod(chartRows);
+  const chartPeriods = range ? periodsIn(period as 'week' | 'month', range.from, range.to) : [...years].reverse();
+
+  const choosePeriod = (p: Period) => { setPeriod(p); setSelectedPeriod(null); };
+  const chooseChartYear = (y: string) => {
+    if (period === 'year') return;
+    setChartYear(c => ({ ...c, [period]: y }));
+    setSelectedPeriod(null);
+  };
   const selectBar = (p: string) => {
     setSelectedPeriod(current => (current === p ? null : p));
-    setShown(PAGE);
     document.getElementById('training-sessions')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   };
 
@@ -136,8 +168,8 @@ const Training = () => {
     if (race) setOpenRace(race);
   };
 
-  if (loading) return <div className="running-page">Loading training...</div>;
   if (error) return <div className="running-page">Error: {error}</div>;
+  if (!yearly) return <div className="running-page">Loading training...</div>;
 
   return (
     <div className="running-page training-page">
@@ -151,18 +183,24 @@ const Training = () => {
       <section className="training-section">
         <div className="training-controls">
           <div className="unit-toggle">
-            {(['week', 'month', 'year'] as Period[]).map(p => (
+            {PERIODS.map(p => (
               <button key={p} className={`toggle-btn ${period === p ? 'active' : ''}`} onClick={() => choosePeriod(p)}>
                 {p === 'week' ? 'Weekly' : p === 'month' ? 'Monthly' : 'Yearly'}
               </button>
             ))}
           </div>
+          {period !== 'year' && (
+            <select aria-label="Chart range" className="chart-range" value={chartYear[period]} onChange={e => chooseChartYear(e.target.value)}>
+              <option value="recent">{RECENT_LABEL[period]}</option>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          )}
           <div className="unit-toggle">
             <button className={`toggle-btn ${metric === 'distance' ? 'active' : ''}`} onClick={() => setMetric('distance')}>Distance</button>
             <button className={`toggle-btn ${metric === 'moving_time' ? 'active' : ''}`} onClick={() => setMetric('moving_time')}>Time</button>
           </div>
         </div>
-        <VolumeChart totals={totals} period={period} metric={metric} selected={selectedPeriod} onSelect={selectBar} />
+        <VolumeChart periods={chartPeriods} totals={chartTotals} period={period} metric={metric} selected={selectedPeriod} onSelect={selectBar} />
         <div className="chart-legend">
           {SPORT_GROUPS.map(g => (
             <span key={g.key}><i style={{ background: g.color }} />{g.label}</span>
@@ -171,7 +209,7 @@ const Training = () => {
             <input
               type="checkbox"
               checked={includeRaces}
-              onChange={e => { setIncludeRaces(e.target.checked); if (!e.target.checked) setRacesOnly(false); setShown(PAGE); }}
+              onChange={e => { setIncludeRaces(e.target.checked); if (!e.target.checked) setRacesOnly(false); }}
             />
             Include races
           </label>
@@ -190,7 +228,7 @@ const Training = () => {
             </tr>
           </thead>
           <tbody>
-            {yearly.map(y => (
+            {yearlyTotals.map(y => (
               <tr key={y.period}>
                 <td>{y.period}</td>
                 {SPORT_GROUPS.slice(0, 4).map(g => {
@@ -214,16 +252,16 @@ const Training = () => {
             </span>
           )}
           <div className="training-filters">
-            <select aria-label="Sport" value={groupFilter} onChange={e => { setGroupFilter(e.target.value); setShown(PAGE); }}>
+            <select aria-label="Sport" value={groupFilter} onChange={e => setGroupFilter(e.target.value)}>
               <option value="all">All sports</option>
               {SPORT_GROUPS.map(g => <option key={g.key} value={g.key}>{g.label}</option>)}
             </select>
-            <select aria-label="Year" value={yearFilter} onChange={e => { setYearFilter(e.target.value); setShown(PAGE); }}>
+            <select aria-label="Year" value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
               <option value="all">All years</option>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             <label className="races-only">
-              <input type="checkbox" checked={racesOnly} disabled={!includeRaces} onChange={e => { setRacesOnly(e.target.checked); setShown(PAGE); }} />
+              <input type="checkbox" checked={racesOnly} disabled={!includeRaces} onChange={e => setRacesOnly(e.target.checked)} />
               Races only
             </label>
           </div>
@@ -233,7 +271,7 @@ const Training = () => {
             <tr><th>Date</th><th>Sport</th><th>Distance</th><th>Time</th><th>Pace</th><th>Elevation</th></tr>
           </thead>
           <tbody>
-            {filtered.slice(0, shown).map((a, i) => (
+            {sessions.map((a, i) => (
               <tr
                 key={`${a.date}-${i}`}
                 className={a.race_activity_id ? 'race-row' : undefined}
@@ -254,9 +292,11 @@ const Training = () => {
           </tbody>
         </table>
         <p className="training-note">
-          {Math.min(shown, filtered.length)} of {filtered.length} sessions
-          {shown < filtered.length && (
-            <button className="toggle-btn show-more" onClick={() => setShown(s => s + PAGE)}>Show more</button>
+          {loadingSessions && sessions.length === 0 ? 'Loading sessions...' : `${sessions.length} of ${total} sessions`}
+          {sessions.length < total && (
+            <button className="toggle-btn show-more" disabled={loadingSessions} onClick={() => fetchPage(sessions.length)}>
+              {loadingSessions ? 'Loading...' : 'Show more'}
+            </button>
           )}
         </p>
       </section>
