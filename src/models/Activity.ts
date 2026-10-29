@@ -3,6 +3,15 @@ import mapboxPolyline from '@mapbox/polyline';
 
 export type UnitSystem = 'metric' | 'imperial';
 
+export interface ActivityPhoto {
+  id: string;
+  width: number;
+  height: number;
+  caption?: string;
+  url: string; // ~1200 px
+  thumb_url: string; // ~400 px wide
+}
+
 export interface StravaActivityJSON {
   id: number;
   name: string;
@@ -26,6 +35,8 @@ export interface StravaActivityJSON {
     map?: {
       summary_polyline: string;
     };
+    description?: string;
+    photos?: ActivityPhoto[];
     [key: string]: any;
   };
   [key: string]: any;
@@ -42,6 +53,8 @@ export class Activity {
   elevationGain: number; // meters
   averageSpeed: number; // m/s
   polyline: [number, number][]; // [lat, lng][]
+  description: string;
+  photos: ActivityPhoto[];
 
   constructor(data: StravaActivityJSON) {
     // Prefer data from data_json if available, as it seems richer based on user provided sample
@@ -56,7 +69,9 @@ export class Activity {
         elapsed_time: undefined,
         total_elevation_gain: undefined,
         average_speed: undefined,
-        map: undefined
+        map: undefined,
+        description: undefined,
+        photos: undefined
     };
 
     this.id = details.id || data.id;
@@ -68,6 +83,9 @@ export class Activity {
     this.elapsedTime = details.elapsed_time ?? data.elapsed_time;
     this.elevationGain = details.total_elevation_gain ?? data.total_elevation_gain;
     this.averageSpeed = details.average_speed ?? data.average_speed ?? 0;
+
+    this.description = (details.description ?? '').trim();
+    this.photos = Array.isArray(details.photos) ? details.photos.filter(p => p && p.url && p.thumb_url) : [];
 
     const summaryPolyline = details.map?.summary_polyline;
     if (summaryPolyline) {

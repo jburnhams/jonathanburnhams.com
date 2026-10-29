@@ -179,4 +179,31 @@ describe('Running Page', () => {
       expect(screen.getByText(/Error:/i)).toBeInTheDocument();
     });
   });
+
+  it('shows the description and photos in the modal, and opens a photo large', async () => {
+    const withPhotos = [{
+      ...mockActivities[0],
+      data_json: {
+        ...mockActivities[0].data_json,
+        description: 'Great day\n<b>not bold</b>',
+        photos: [{ id: '1_0', width: 1200, height: 800, url: 'https://x/api/photos/1_0', thumb_url: 'https://x/api/photos/1_0?size=thumb' }],
+      },
+    }];
+    (global.fetch as any).mockResolvedValue({ ok: true, json: async () => withPhotos });
+
+    render(<Running />);
+    fireEvent.click(await screen.findByText('Test Run 1'));
+
+    const description = await screen.findByText(/Great day/);
+    expect(description.textContent).toBe('Great day\n<b>not bold</b>'); // text, not HTML
+    expect(description.querySelector('b')).toBeNull();
+
+    const thumb = screen.getByRole('img', { name: 'Test Run 1' });
+    expect(thumb).toHaveAttribute('src', 'https://x/api/photos/1_0?size=thumb');
+    expect(thumb).toHaveAttribute('loading', 'lazy');
+
+    fireEvent.click(thumb);
+    const large = screen.getAllByRole('img', { name: 'Test Run 1' }).find(img => img.getAttribute('src') === 'https://x/api/photos/1_0');
+    expect(large).toBeDefined();
+  });
 });

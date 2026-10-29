@@ -103,4 +103,20 @@ describe('Activity Model', () => {
     expect(activity.name).toBe('Simple Run');
     expect(activity.getFormattedDistance('metric')).toBe('5.00 km');
   });
+
+  it('reads description and photos from data_json', () => {
+    const photo = { id: '1_0', width: 1200, height: 800, url: 'https://x/api/photos/1_0', thumb_url: 'https://x/api/photos/1_0?size=thumb' };
+    const activity = new Activity({
+      ...mockActivityData,
+      data_json: { ...mockActivityData.data_json, description: '  Line one\nLine two  ', photos: [photo, { id: 'bad' } as unknown as typeof photo] },
+    });
+    expect(activity.description).toBe('Line one\nLine two');
+    expect(activity.photos).toEqual([photo]); // entries without urls are dropped
+  });
+
+  it('defaults to no description and no photos', () => {
+    const activity = new Activity(mockActivityData);
+    expect(activity.description).toBe('');
+    expect(activity.photos).toEqual([]);
+  });
 });

@@ -156,6 +156,66 @@
   font-weight: bold;
 }
 
+.activity-description {
+  white-space: pre-line; /* keep the description's line breaks */
+  line-height: 1.5;
+  margin: 0 0 1.5rem;
+}
+
+.activity-photos {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.activity-photo-thumb {
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+}
+
+.activity-photo-thumb img {
+  display: block;
+  height: 120px;
+  width: auto;
+  border-radius: 4px;
+}
+
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.92);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+  padding: 2rem;
+  cursor: zoom-out;
+}
+
+.photo-lightbox img {
+  max-width: 100%;
+  max-height: calc(100vh - 6rem);
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.photo-caption {
+  color: #eee;
+  margin-top: 0.75rem;
+}
+
+.photo-lightbox-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
 .map-container {
   height: 400px;
   width: 100%;

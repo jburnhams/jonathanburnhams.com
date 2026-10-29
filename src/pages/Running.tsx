@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Activity, StravaActivityJSON, UnitSystem } from '../models/Activity';
+import { Activity, ActivityPhoto, StravaActivityJSON, UnitSystem } from '../models/Activity';
 import './Running.css';
 
 // Component to fit map bounds to polyline
@@ -30,6 +30,7 @@ const Running = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
+  const [openPhoto, setOpenPhoto] = useState<ActivityPhoto | null>(null);
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -152,11 +153,11 @@ const Running = () => {
       </table>
 
       {selectedActivity && (
-        <div className="modal-overlay" onClick={() => setSelectedActivity(null)}>
+        <div className="modal-overlay" onClick={() => { setOpenPhoto(null); setSelectedActivity(null); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{selectedActivity.name}</h2>
-              <button className="modal-close" onClick={() => setSelectedActivity(null)}>×</button>
+              <button className="modal-close" onClick={() => { setOpenPhoto(null); setSelectedActivity(null); }}>×</button>
             </div>
             <div className="modal-body">
               <div className="activity-stats">
@@ -182,6 +183,31 @@ const Running = () => {
                 </div>
               </div>
 
+              {selectedActivity.description && (
+                <p className="activity-description">{selectedActivity.description}</p>
+              )}
+
+              {selectedActivity.photos.length > 0 && (
+                <div className="activity-photos">
+                  {selectedActivity.photos.map(photo => (
+                    <button
+                      key={photo.id}
+                      type="button"
+                      className="activity-photo-thumb"
+                      onClick={() => setOpenPhoto(photo)}
+                    >
+                      <img
+                        src={photo.thumb_url}
+                        alt={photo.caption || selectedActivity.name}
+                        loading="lazy"
+                        width={400}
+                        height={Math.round((400 * photo.height) / photo.width) || undefined}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {selectedActivity.polyline.length > 0 ? (
                 <div className="map-container">
                   <MapContainer
@@ -205,6 +231,14 @@ const Running = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {openPhoto && (
+        <div className="photo-lightbox" onClick={() => setOpenPhoto(null)}>
+          <img src={openPhoto.url} alt={openPhoto.caption || selectedActivity?.name || ''} />
+          {openPhoto.caption && <p className="photo-caption">{openPhoto.caption}</p>}
+          <button className="modal-close photo-lightbox-close" onClick={() => setOpenPhoto(null)}>×</button>
         </div>
       )}
     </div>
