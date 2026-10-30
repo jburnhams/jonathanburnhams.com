@@ -18,7 +18,7 @@ export function FitBounds({ polyline, bounds }: { polyline?: [number, number][],
   return null;
 }
 
-// A few arrowheads along the route showing the direction of travel, in the route's colour
+// A few small chevrons along the route showing the (smoothed) direction of travel, in the route's colour
 function DirectionArrows({ activity, color }: { activity: Activity; color: string }) {
   return (
     <>
@@ -29,9 +29,12 @@ function DirectionArrows({ activity, color }: { activity: Activity; color: strin
           interactive={false}
           icon={L.divIcon({
             className: 'route-arrow',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12],
-            html: `<svg width="24" height="24" viewBox="0 0 16 16" style="transform: rotate(${bearing.toFixed(0)}deg)"><path d="M8 1 L14.5 14.5 L8 11 L1.5 14.5 Z" fill="${color}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+            // An open chevron pointing up (north) before rotation: a white outline under the route colour
+            html: `<svg width="18" height="18" viewBox="0 0 18 18" style="transform: rotate(${bearing.toFixed(0)}deg)">`
+              + `<path d="M4 12 L9 6 L14 12" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`
+              + `<path d="M4 12 L9 6 L14 12" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
           })}
         />
       ))}
