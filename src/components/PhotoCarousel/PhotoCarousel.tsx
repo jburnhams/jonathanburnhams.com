@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import './PhotoCarousel.css';
-import { CarouselPhoto, PHOTOS_API, THUMB_WIDTH, slotsFor } from './carousel';
+import { CarouselPhoto, PHOTOS_API, ROW_HEIGHT, fitsAtEnd, swapIn, thumbWidth, trimToFit } from './carousel';
 
 const PAGE = 20;
 const INTERVAL_MS = 10000;
@@ -15,9 +15,10 @@ const formatDate = (d: string | null) =>
 
 /**
  * A row of race photos from the strava-sync API in a random order (a new seed on
- * every page load). Shows as many whole thumbnails as fit; every 10 seconds one of
- * them changes to the next photo in the sequence, which only repeats after every
- * photo has been shown. Clicking a thumbnail opens it large; clicking that calls
+ * every page load), all 250 px tall at their own shape, as many whole ones as fit.
+ * Every 10 seconds one of them changes to the next photo in the sequence, which only
+ * repeats after every photo has been shown: it goes into a slot where it fits, so the
+ * row keeps its length; if it fits nowhere, thumbnails at the end make room. Clicking a thumbnail opens it large; clicking that calls
  * onOpenActivity with the photo's Strava activity id (the homepage navigates to
  * /running?activity=<id>, the Running page opens the race's popup in place).
  */
@@ -30,7 +31,7 @@ function PhotoCarousel({ onOpenActivity, intervalMs = INTERVAL_MS, seed: fixedSe
   const next = useRef(0); // index in queue of the next photo to show
   const fetching = useRef<Promise<void> | null>(null);
   const lastSlot = useRef(-1);
-  const [slotCount, setSlotCount] = useState(0);
+  const [width, setWidth] = useState(0);
   const [slots, setSlots] = useState<CarouselPhoto[]>([]);
   const [open, setOpen] = useState<CarouselPhoto | null>(null);
   const [failed, setFailed] = useState(false);
@@ -51,20 +52,18 @@ function PhotoCarousel({ onOpenActivity, intervalMs = INTERVAL_MS, seed: fixedSe
     return fetching.current;
   }, [seed]);
 
-  // Take the next photo, fetching more when fewer than a row's worth remain
-  const take = useCallback(async (): Promise<CarouselPhoto | undefined> => {
+  // The next photo in the sequence without taking it (fetching more when needed)
+  const peek = useCallback(async (): Promise<CarouselPhoto | undefined> => {
     if (next.current >= queue.current.length) await fetchMore();
-    const photo = queue.current[next.current];
-    if (photo) next.current++;
-    if (queue.current.length - next.current < Math.max(slotCount, 5)) void fetchMore();
-    return photo;
-  }, [fetchMore, slotCount]);
+    if (queue.current.length - next.current < 10) void fetchMore();
+    return queue.current[next.current];
+  }, [fetchMore]);
 
-  // Number of slots from the width: on mount and whenever the container resizes
+  // The row's width: on mount and whenever the container resizes
   useEffect(() => {
     const el = container.current;
     if (!el) return;
-    const measure = () => setSlotCount(slotsFor(el.clientWidth || window.innerWidth));
+    const measure = () => setWidth(el.clientWidth || window.innerWidth);
     measure();
     if (typeof ResizeObserver !== 'undefined') {
       const ro = new ResizeObserver(measure);
@@ -75,36 +74,39 @@ function PhotoCarousel({ onOpenActivity, intervalMs = INTERVAL_MS, seed: fixedSe
     return () => window.removeEventListener('resize', measure);
   }, []);
 
-  // Fill new slots when the row grows; drop the extra ones when it shrinks
-  useEffect(() => {
-    if (!slotCount) return;
-    let cancelled = false;
-    (async () => {
-      const filled = slots.slice(0, slotCount);
-      while (filled.length < slotCount) {
-        const photo = await take();
-        if (!photo) break;
-        filled.push(photo);
-      }
-      if (!cancelled) setSlots(filled);
-    })();
-    return () => { cancelled = true; };
-  }, [slotCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Fit the row to the width: drop thumbnails from the end, or add the next photos while they fit
+  const fill = useCallback(async (row: CarouselPhoto[]) => {
+    const out = trimToFit(row, width);
+    for (;;) {
+      const photo = await peek();
+      if (!photo || !fitsAtEnd(out, photo, width)) break;
+      out.push(photo);
+      next.current++;
+    }
+    return out;
+  }, [peek, width]);
 
-  // Every interval, one slot (random, not the same as last time) changes to the next photo.
+  useEffect(() => {
+    if (!width) return;
+    let cancelled = false;
+    fill(slots).then(row => { if (!cancelled) setSlots(row); });
+    return () => { cancelled = true; };
+  }, [width]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Every interval the next photo replaces one thumbnail (random, not the one changed last).
   // Paused while the tab is hidden or a photo is open.
   useEffect(() => {
     const timer = setInterval(async () => {
-      if (document.hidden || open || slots.length === 0) return;
-      let slot = Math.floor(Math.random() * slots.length);
-      if (slots.length > 1 && slot === lastSlot.current) slot = (slot + 1) % slots.length;
-      const photo = await take();
+      if (document.hidden || open || slots.length === 0 || !width) return;
+      const photo = await peek();
       if (!photo) return;
+      next.current++;
+      const { row, slot } = swapIn(slots, photo, width, Math.random, lastSlot.current);
       lastSlot.current = slot;
-      setSlots(current => current.map((p, i) => (i === slot ? photo : p)));
+      setSlots(row.length < slots.length ? await fill(row) : row);
     }, intervalMs);
     return () => clearInterval(timer);
-  }, [intervalMs, open, slots.length, take]);
+  }, [intervalMs, open, slots, width, peek, fill]);
 
   // Esc closes the large photo
   useEffect(() => {
@@ -124,6 +126,7 @@ function PhotoCarousel({ onOpenActivity, intervalMs = INTERVAL_MS, seed: fixedSe
         <button
           key={i}
           type="button"
+          style={{ width: thumbWidth(photo) }}
           className="photo-carousel-slot"
           onClick={() => setOpen(photo)}
           title={[photo.activity.name, formatDate(photo.activity.date)].filter(Boolean).join(', ')}
@@ -133,8 +136,8 @@ function PhotoCarousel({ onOpenActivity, intervalMs = INTERVAL_MS, seed: fixedSe
             className="photo-carousel-thumb"
             src={photo.thumb_url}
             alt={photo.caption || photo.activity.name || 'Race photo'}
-            width={THUMB_WIDTH}
-            height={Math.round((THUMB_WIDTH * 3) / 4)}
+            width={thumbWidth(photo)}
+            height={ROW_HEIGHT}
           />
         </button>
       ))}

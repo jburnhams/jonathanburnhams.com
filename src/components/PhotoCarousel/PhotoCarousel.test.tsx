@@ -2,11 +2,12 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import PhotoCarousel from './PhotoCarousel';
-import { PHOTOS_API, slotsFor, CarouselPhoto } from './carousel';
+import { PHOTOS_API, CarouselPhoto, fitsAtEnd, rowWidth, swapIn, thumbWidth, trimToFit } from './carousel';
 
 // The API's sequence for a seed: photo n is "p<n>", any offset
+// Every third photo is portrait (80 px wide at the 120 px row height), the rest landscape (180 px)
 const photo = (n: number): CarouselPhoto => ({
-  id: `1_${n}`, width: 1200, height: 800, url: `https://x/api/photos/1_${n}`, thumb_url: `https://x/api/photos/1_${n}?size=thumb`,
+  id: `1_${n}`, width: n % 3 === 0 ? 800 : 1200, height: n % 3 === 0 ? 1200 : 800, url: `https://x/api/photos/1_${n}`, thumb_url: `https://x/api/photos/1_${n}?size=thumb`,
   activity: { id: 100 + (n % 3), name: `Race ${n % 3}`, date: '2026-09-13' },
 });
 let pageSize = 20;
@@ -51,18 +52,40 @@ describe('PhotoCarousel', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('fits only whole thumbnails', () => {
-    expect(slotsFor(160)).toBe(1);
-    expect(slotsFor(327)).toBe(1);
-    expect(slotsFor(328)).toBe(2);
-    expect(slotsFor(520)).toBe(3);
-    expect(slotsFor(0)).toBe(1);
+  it('sizes thumbnails by shape and fits only whole ones', () => {
+    expect(thumbWidth(photo(1))).toBe(180);
+    expect(thumbWidth(photo(0))).toBe(80);
+    expect(thumbWidth({ ...photo(1), width: 0 })).toBe(180); // unknown size: 3:2
+    expect(rowWidth([photo(0), photo(1), photo(2)])).toBe(80 + 180 + 180 + 2 * 8);
+    expect(fitsAtEnd([photo(0), photo(1), photo(2)], photo(3), 520)).toBe(false); // 544 > 520
+    expect(fitsAtEnd([photo(0), photo(1)], photo(2), 520)).toBe(true);
+    expect(fitsAtEnd([], { ...photo(1), width: 9000 }, 100)).toBe(true); // a lone photo always shows
+    expect(trimToFit([photo(1), photo(2), photo(4), photo(5)], 400).map(p => p.id)).toEqual(['1_1', '1_2']);
+    expect(trimToFit([photo(1)], 50)).toHaveLength(1);
+  });
+
+  it('swaps a photo into a slot where it fits, or makes room at the end', () => {
+    const row = [photo(0), photo(1), photo(2)]; // 80 + 180 + 180 = 456 of 470
+    // A wide photo only fits in place of a wide one, and never the slot changed last
+    const wide = photo(4);
+    const fit = swapIn(row, wide, 470, () => 0, 1);
+    expect(fit.slot).toBe(2);
+    expect(fit.row.map(p => p.id)).toEqual(['1_0', '1_1', '1_4']);
+    // Too wide for any slot: replace one and drop from the end, keeping the new photo
+    const huge = { ...photo(7), width: 4000, height: 1000 }; // 480 px
+    const made = swapIn(row, huge, 470, () => 0.99);
+    expect(made.row).toContain(huge);
+    expect(rowWidth(made.row) <= 470 || made.row.length === 1).toBe(true);
+    expect(made.row[made.slot]).toBe(huge);
   });
 
   it('shows as many photos as fit, from the seeded sequence', async () => {
     renderCarousel(60000);
-    await waitFor(() => expect(thumbs()).toHaveLength(3));
+    await waitFor(() => expect(thumbs()).toHaveLength(3)); // 80 + 180 + 180 + gaps = 456; a 4th (80) would make 544 > 520
     expect(thumbs()).toEqual(['https://x/api/photos/1_0?size=thumb', 'https://x/api/photos/1_1?size=thumb', 'https://x/api/photos/1_2?size=thumb']);
+    const widths = screen.getAllByRole('img').map(img => img.getAttribute('width'));
+    expect(widths).toEqual(['80', '180', '180']);
+    expect(screen.getAllByRole('img').every(img => img.getAttribute('height') === '120')).toBe(true);
     expect(requests[0].get('seed')).toBe('test-seed');
     expect(requests[0].get('offset')).toBe('0');
     expect(requests[0].get('limit')).toBe('20');
