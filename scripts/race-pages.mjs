@@ -155,10 +155,35 @@ export function sitemap(races, slugs) {
   const urls = [
     { loc: `${SITE}/` },
     { loc: `${SITE}/running/` },
-    { loc: `${SITE}/training` },
+    { loc: `${SITE}/training/` },
     ...races.map((a) => ({ loc: `${SITE}/running/${slugs[a.id]}/`, lastmod: localDate(a) })),
   ];
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
     .map((u) => `  <url><loc>${escapeHtml(u.loc)}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`)
     .join('\n')}\n</urlset>\n`;
+}
+
+// The homepage's static HTML: the hero with plain links (same markup and classes as the Hero
+// component, so it looks the same before the app takes over), so crawlers can follow them
+export function homePage(template) {
+  const links = [
+    ['/running/', '🏃‍♂️ Running 🏃‍♀️'],
+    ['/training/', '📈 Training'],
+    ['https://www.strava.com/athletes/jburnhams', '🔗 Strava Profile'],
+    ['https://www.youtube.com/@JonathanBurnhams', '📹 YouTube 🎬'],
+    ['https://github.com/jburnhams', '👨‍💻 GitHub 💻'],
+  ].map(([href, text]) => `<a href="${href}" class="hero-link">${text}</a>`).join('');
+  const body = `<section class="hero" role="banner"><div class="hero-content"><h1 class="hero-title"><span class="hero-name">Jonathan Burnhams</span></h1>`
+    + `<div class="hero-underline" aria-hidden="true"></div><div class="hero-links">${links}</div></div></section>`;
+  return template.replace('<div id="root"></div>', `<div id="root">${body}</div>`);
+}
+
+// /training/ has its own file, so it isn't served the homepage's HTML (with its hero) before the app loads
+export function trainingPage(template) {
+  return renderPage(template, {
+    title: 'Training | Jonathan Burnhams',
+    description: 'Every training session recorded on my watch since 2018, by week, month and year: running, cycling, swimming and hiking.',
+    path: '/training/',
+    body: '',
+  });
 }

@@ -142,6 +142,6 @@ describe('Hero', () => {
   it('renders the Training link correctly', () => {
     render(<BrowserRouter><Hero /></BrowserRouter>)
     const link = screen.getByText(/Training/)
-    expect(link.closest('a')).toHaveAttribute('href', '/training')
+    expect(link.closest('a')).toHaveAttribute('href', '/training/')
   })
 })

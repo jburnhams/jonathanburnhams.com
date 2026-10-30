@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  assignSlugs, escapeHtml, jsonLd, raceList, racePage, runningIndexPage, scriptJson, sitemap, slugify, summary,
+  assignSlugs, escapeHtml, homePage, jsonLd, trainingPage, raceList, racePage, runningIndexPage, scriptJson, sitemap, slugify, summary,
 } from './race-pages.mjs';
 
 const TEMPLATE = `<!doctype html><html><head>
@@ -74,5 +74,21 @@ describe('race pages', () => {
     const xml = sitemap(races, slugs);
     expect(xml.match(/<url>/g)).toHaveLength(5);
     expect(xml).toContain('<url><loc>https://www.jonathanburnhams.com/running/2025-a/</loc><lastmod>2025-01-01</lastmod></url>');
+  });
+
+  it('puts plain links to /running/ and /training in the homepage HTML, matching the Hero markup', () => {
+    const html = homePage(TEMPLATE);
+    expect(html).toContain('<a href="/running/" class="hero-link">');
+    expect(html).toContain('<a href="/training/" class="hero-link">');
+    expect(html).toContain('<span class="hero-name">Jonathan Burnhams</span>');
+    expect(html).toContain('<title>Jonathan Burnhams</title>'); // head unchanged
+    expect(html.match(/id="root"/g)).toHaveLength(1);
+  });
+
+  it('gives /training/ its own page without the homepage hero', () => {
+    const html = trainingPage(TEMPLATE);
+    expect(html).toContain('<title>Training | Jonathan Burnhams</title>');
+    expect(html).toContain('<link rel="canonical" href="https://www.jonathanburnhams.com/training/" />');
+    expect(html).toContain('<div id="root"></div>');
   });
 });
