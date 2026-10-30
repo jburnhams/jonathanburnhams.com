@@ -4,13 +4,15 @@
   gap: 8px; /* THUMB_GAP */
   width: min(1200px, 92vw);
   margin: 2.5rem auto 0;
-  min-height: 120px;
+  height: 120px; /* ROW_HEIGHT */
   animation: fadeInUp 1s ease-out 1s both;
 }
 
 .photo-carousel-slot {
-  flex: 0 0 160px; /* THUMB_WIDTH */
-  height: 120px;
+  flex: 0 1 auto; /* width set per photo; a lone photo wider than the row shrinks (cropped) */
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
   padding: 0;
   border: none;
   border-radius: 8px;
@@ -18,6 +20,10 @@
   background: rgba(255, 255, 255, 0.05);
   cursor: zoom-in;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.photo-carousel-slot {
+  transition: width 0.6s ease;
 }
 
 .photo-carousel-slot:hover {
