@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Activity, StravaActivityJSON, UnitSystem } from '../models/Activity';
 import { ActivityModal, FitBounds } from '../components/ActivityModal/ActivityModal';
+import PhotoCarousel from '../components/PhotoCarousel/PhotoCarousel';
 import './Running.css';
 
 const getColorForActivity = (id: number): string => {
@@ -18,6 +19,8 @@ const Running = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
+  // Every activity from the API (not only the listed runs), so a photo of any race can open its popup
+  const [allById, setAllById] = useState<Map<number, Activity>>(new Map());
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -27,11 +30,16 @@ const Running = () => {
           throw new Error('Failed to fetch activities');
         }
         const data: StravaActivityJSON[] = await response.json();
-        const parsedActivities = data
-          .map(item => new Activity(item))
+        const all = data.map(item => new Activity(item));
+        const parsedActivities = all
           .filter(activity => activity.type === 'Run' && activity.distance > 20000)
           .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
         setActivities(parsedActivities);
+        setAllById(new Map(all.map(a => [a.id, a])));
+        // /running?activity=<id> (e.g. from a homepage photo) opens that activity, even one not in the list
+        const linked = Number(new URLSearchParams(window.location.search).get('activity'));
+        const target = linked ? all.find(a => a.id === linked) : undefined;
+        if (target) setSelectedActivity(target);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -41,6 +49,12 @@ const Running = () => {
 
     fetchActivities();
   }, []);
+
+  // Closing drops ?activity= so a reload doesn't reopen it
+  const closeActivity = () => {
+    setSelectedActivity(null);
+    if (window.location.search.includes('activity=')) window.history.replaceState(null, '', window.location.pathname);
+  };
 
   const allPolylinesBounds = useMemo(() => {
     const allPoints = activities.flatMap(a => a.polyline);
@@ -85,6 +99,11 @@ const Running = () => {
           </div>
         </div>
       </header>
+
+      <PhotoCarousel
+        className="running-carousel"
+        onOpenActivity={id => { const a = allById.get(id); if (a) setSelectedActivity(a); }}
+      />
 
       {/* Main Map with all activities */}
       <div className="all-activities-map-container">
@@ -140,7 +159,7 @@ const Running = () => {
       </table>
 
       {selectedActivity && (
-        <ActivityModal activity={selectedActivity} unitSystem={unitSystem} onClose={() => setSelectedActivity(null)} />
+        <ActivityModal activity={selectedActivity} unitSystem={unitSystem} onClose={closeActivity} />
       )}
     </div>
   );

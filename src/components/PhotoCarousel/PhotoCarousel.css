@@ -1,0 +1,119 @@
+.photo-carousel {
+  display: flex;
+  justify-content: center;
+  gap: 8px; /* THUMB_GAP */
+  width: min(1200px, 92vw);
+  margin: 2.5rem auto 0;
+  height: 120px; /* ROW_HEIGHT */
+  animation: fadeInUp 1s ease-out 1s both;
+}
+
+.photo-carousel-slot {
+  flex: 0 1 auto; /* width set per photo; a lone photo wider than the row shrinks (cropped) */
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: zoom-in;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.photo-carousel-slot {
+  transition: width 0.6s ease;
+}
+
+.photo-carousel-slot:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.photo-carousel-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: photoFadeIn 1.2s ease;
+}
+
+@keyframes photoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.photo-carousel-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(0, 0, 0, 0.92);
+  cursor: zoom-out;
+}
+
+.photo-carousel-modal figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  cursor: default;
+}
+
+.photo-carousel-modal img {
+  max-width: 100%;
+  max-height: calc(100vh - 7rem);
+  object-fit: contain;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.photo-carousel-modal figcaption {
+  margin-top: 0.75rem;
+  color: #ccc;
+  text-align: center;
+}
+
+.photo-carousel-race {
+  background: none;
+  border: none;
+  color: #a78bfa;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.photo-carousel-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  color: #eee;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.photo-carousel.running-carousel {
+  width: 100%;
+  margin: 0 0 1.5rem;
+  animation: none;
+}
+
+@media (max-width: 768px) {
+  .photo-carousel {
+    margin-top: 2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-carousel,
+  .photo-carousel-thumb {
+    animation: none;
+  }
+}

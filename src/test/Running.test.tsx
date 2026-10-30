@@ -222,4 +222,31 @@ describe('Running Page', () => {
     expect(screen.getAllByTestId('circle-marker')).toHaveLength(2);
     expect(screen.getAllByTestId('route-arrow')).toHaveLength(5);
   });
+
+  it('opens the activity named in ?activity= (a link from a homepage photo)', async () => {
+    window.history.pushState({}, '', '/running?activity=2');
+    (global.fetch as any).mockResolvedValue({ ok: true, json: async () => mockActivities });
+    render(<Running />);
+    expect(await screen.findByRole('heading', { level: 2, name: 'Test Run 2' })).toBeInTheDocument();
+    fireEvent.click(screen.getByText('×'));
+    expect(window.location.search).toBe(''); // closing drops the parameter
+    window.history.pushState({}, '', '/');
+  });
+
+  it('shows race photos under the title, and a photo opens its race in place', async () => {
+    const photo = { id: '2_0', width: 1200, height: 800, url: 'https://x/api/photos/2_0', thumb_url: 'https://x/api/photos/2_0?size=thumb',
+      activity: { id: 2, name: 'Test Run 2', date: '2023-01-02' } };
+    (global.fetch as any).mockImplementation(async (url: string) => ({
+      ok: true, json: async () => (url.includes('/api/photos/random') ? [photo] : mockActivities),
+    }));
+    render(<Running />);
+    await screen.findByText('Test Run 1');
+    const [thumb] = await screen.findAllByRole('img', { name: 'Test Run 2' });
+    expect(thumb).toHaveAttribute('src', 'https://x/api/photos/2_0?size=thumb');
+    expect(thumb.closest('.photo-carousel')!.compareDocumentPosition(screen.getAllByTestId('map-container')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // above the map
+    fireEvent.click(thumb);
+    fireEvent.click(screen.getByRole('dialog').querySelector('img')!);
+    expect(await screen.findByRole('heading', { level: 2, name: 'Test Run 2' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/'); // no navigation
+  });
 });
