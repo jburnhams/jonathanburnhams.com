@@ -2,6 +2,7 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Running from '../pages/Running';
+import { clearRacePagesCache } from '../utils/racePages';
 
 // Mock react-leaflet
 vi.mock('react-leaflet', () => {
@@ -39,6 +40,7 @@ global.fetch = vi.fn();
 describe('Running Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearRacePagesCache();
   });
 
   const mockActivities = [
@@ -248,5 +250,24 @@ describe('Running Page', () => {
     fireEvent.click(screen.getByRole('dialog').querySelector('img')!);
     expect(await screen.findByRole('heading', { level: 2, name: 'Test Run 2' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/'); // no navigation
+  });
+
+  it('links each run to its race page, and sends old ?activity= links there', async () => {
+    (global.fetch as any).mockImplementation(async (url: string) => ({
+      ok: true, json: async () => (url === '/race-pages.json' ? { 1: '2023-test-run-1' } : mockActivities),
+    }));
+    render(<Running />);
+    expect(await screen.findByRole('link', { name: 'Test Run 1' })).toHaveAttribute('href', '/running/2023-test-run-1/');
+    expect(screen.queryByRole('link', { name: 'Test Run 2' })).toBeNull(); // no page: the row opens the popup
+
+    const replace = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, search: '?activity=1', replace, pathname: '/running' } });
+    try {
+      render(<Running />);
+      await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/running/2023-test-run-1/'));
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: original });
+    }
   });
 });

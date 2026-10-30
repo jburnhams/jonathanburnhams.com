@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { Activity, StravaActivityJSON, UnitSystem } from '../models/Activity';
 import { ActivityModal, FitBounds } from '../components/ActivityModal/ActivityModal';
 import PhotoCarousel from '../components/PhotoCarousel/PhotoCarousel';
+import { getRacePages, racePageUrl } from '../utils/racePages';
 import './Running.css';
 
 const getColorForActivity = (id: number): string => {
@@ -21,6 +22,9 @@ const Running = () => {
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
   // Every activity from the API (not only the listed runs), so a photo of any race can open its popup
   const [allById, setAllById] = useState<Map<number, Activity>>(new Map());
+  // Strava id -> race page slug (built with the site); empty in dev or if the build couldn't fetch them
+  const [racePages, setRacePages] = useState<Record<string, string>>({});
+  const pageFor = (id: number) => (racePages[id] ? racePageUrl(racePages[id]) : undefined);
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -29,7 +33,8 @@ const Running = () => {
         if (!response.ok) {
           throw new Error('Failed to fetch activities');
         }
-        const data: StravaActivityJSON[] = await response.json();
+        const [data, slugs] = await Promise.all([response.json() as Promise<StravaActivityJSON[]>, getRacePages()]);
+        setRacePages(slugs);
         const all = data.map(item => new Activity(item));
         const parsedActivities = all
           .filter(activity => activity.type === 'Run' && activity.distance > 20000)
@@ -38,6 +43,10 @@ const Running = () => {
         setAllById(new Map(all.map(a => [a.id, a])));
         // /running?activity=<id> (e.g. from a homepage photo) opens that activity, even one not in the list
         const linked = Number(new URLSearchParams(window.location.search).get('activity'));
+        if (linked && slugs[linked]) {
+          window.location.replace(racePageUrl(slugs[linked])); // old links now go to the race's own page
+          return;
+        }
         const target = linked ? all.find(a => a.id === linked) : undefined;
         if (target) setSelectedActivity(target);
       } catch (err) {
@@ -102,7 +111,11 @@ const Running = () => {
 
       <PhotoCarousel
         className="running-carousel"
-        onOpenActivity={id => { const a = allById.get(id); if (a) setSelectedActivity(a); }}
+        onOpenActivity={id => {
+          const url = pageFor(id);
+          if (url) window.location.assign(url);
+          else { const a = allById.get(id); if (a) setSelectedActivity(a); }
+        }}
       />
 
       {/* Main Map with all activities */}
@@ -146,9 +159,16 @@ const Running = () => {
         </thead>
         <tbody>
           {activities.map(activity => (
-            <tr key={activity.id} onClick={() => setSelectedActivity(activity)}>
+            <tr
+              key={activity.id}
+              onClick={() => { const url = pageFor(activity.id); if (url) window.location.assign(url); else setSelectedActivity(activity); }}
+            >
               <td>{activity.formattedDate}</td>
-              <td>{activity.name}</td>
+              <td>
+                {pageFor(activity.id)
+                  ? <a className="activity-name-link" href={pageFor(activity.id)} onClick={e => e.stopPropagation()}>{activity.name}</a>
+                  : activity.name}
+              </td>
               <td>{activity.getFormattedDistance(unitSystem)}</td>
               <td>{activity.formattedMovingTime}</td>
               <td>{activity.getFormattedPace(unitSystem)}</td>
@@ -159,7 +179,7 @@ const Running = () => {
       </table>
 
       {selectedActivity && (
-        <ActivityModal activity={selectedActivity} unitSystem={unitSystem} onClose={closeActivity} />
+        <ActivityModal activity={selectedActivity} unitSystem={unitSystem} onClose={closeActivity} pageUrl={pageFor(selectedActivity.id)} />
       )}
     </div>
   );

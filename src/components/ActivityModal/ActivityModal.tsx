@@ -61,95 +61,83 @@ function StartFinishMarkers({ activity }: { activity: Activity }) {
     </>
   );
 }
-
-// The activity popup: stats, description, photos (with a lightbox) and the route map.
-// Used by the Running page and by the Training page for races.
-export function ActivityModal({ activity, unitSystem, onClose }: { activity: Activity; unitSystem: UnitSystem; onClose: () => void }) {
+// The details of an activity: stats, description, photos (with a lightbox) and the route map.
+// Shown in the popup (ActivityModal) and on each race's own page.
+export function ActivityDetails({ activity, unitSystem }: { activity: Activity; unitSystem: UnitSystem }) {
   const [openPhoto, setOpenPhoto] = useState<ActivityPhoto | null>(null);
-  const close = () => { setOpenPhoto(null); onClose(); };
   return (
     <>
-        <div className="modal-overlay" onClick={close}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{activity.name}</h2>
-              <button className="modal-close" onClick={close}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="activity-stats">
-                <div className="stat-item">
-                  <span className="stat-label">Date</span>
-                  <span className="stat-value">{activity.formattedDate}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Distance</span>
-                  <span className="stat-value">{activity.getFormattedDistance(unitSystem)}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Moving Time</span>
-                  <span className="stat-value">{activity.formattedMovingTime}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Pace</span>
-                  <span className="stat-value">{activity.getFormattedPace(unitSystem)}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Elevation Gain</span>
-                  <span className="stat-value">{activity.getFormattedElevation(unitSystem)}</span>
-                </div>
-              </div>
-
-              {activity.description && (
-                <p className="activity-description">{activity.description}</p>
-              )}
-
-              {activity.photos.length > 0 && (
-                <div className="activity-photos">
-                  {activity.photos.map(photo => (
-                    <button
-                      key={photo.id}
-                      type="button"
-                      className="activity-photo-thumb"
-                      onClick={() => setOpenPhoto(photo)}
-                    >
-                      <img
-                        src={photo.thumb_url}
-                        alt={photo.caption || activity.name}
-                        loading="lazy"
-                        width={400}
-                        height={Math.round((400 * photo.height) / photo.width) || undefined}
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {activity.polyline.length > 0 ? (
-                <div className="map-container">
-                  <MapContainer
-                    center={activity.polyline[0]}
-                    zoom={13}
-                    scrollWheelZoom={false}
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <Polyline positions={activity.polyline} color="blue" />
-                    <DirectionArrows activity={activity} color="blue" />
-                    <StartFinishMarkers activity={activity} />
-                    <FitBounds polyline={activity.polyline} />
-                  </MapContainer>
-                </div>
-              ) : (
-                <div className="map-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  No map data available
-                </div>
-              )}
-            </div>
-          </div>
+      <div className="activity-stats">
+        <div className="stat-item">
+          <span className="stat-label">Date</span>
+          <span className="stat-value">{activity.formattedDate}</span>
         </div>
+        <div className="stat-item">
+          <span className="stat-label">Distance</span>
+          <span className="stat-value">{activity.getFormattedDistance(unitSystem)}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Moving Time</span>
+          <span className="stat-value">{activity.formattedMovingTime}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Pace</span>
+          <span className="stat-value">{activity.getFormattedPace(unitSystem)}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">Elevation Gain</span>
+          <span className="stat-value">{activity.getFormattedElevation(unitSystem)}</span>
+        </div>
+      </div>
+
+      {activity.description && (
+        <p className="activity-description">{activity.description}</p>
+      )}
+
+      {activity.photos.length > 0 && (
+        <div className="activity-photos">
+          {activity.photos.map(photo => (
+            <button
+              key={photo.id}
+              type="button"
+              className="activity-photo-thumb"
+              onClick={() => setOpenPhoto(photo)}
+            >
+              <img
+                src={photo.thumb_url}
+                alt={photo.caption || activity.name}
+                loading="lazy"
+                width={400}
+                height={Math.round((400 * photo.height) / photo.width) || undefined}
+              />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activity.polyline.length > 0 ? (
+        <div className="map-container">
+          <MapContainer
+            center={activity.polyline[0]}
+            zoom={13}
+            scrollWheelZoom={false}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <Polyline positions={activity.polyline} color="blue" />
+            <DirectionArrows activity={activity} color="blue" />
+            <StartFinishMarkers activity={activity} />
+            <FitBounds polyline={activity.polyline} />
+          </MapContainer>
+        </div>
+      ) : (
+        <div className="map-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          No map data available
+        </div>
+      )}
 
       {openPhoto && (
         <div className="photo-lightbox" onClick={() => setOpenPhoto(null)}>
@@ -159,6 +147,27 @@ export function ActivityModal({ activity, unitSystem, onClose }: { activity: Act
         </div>
       )}
     </>
+  );
+}
+
+// The activity popup, used by the Running page (overview map) and the Training page (races).
+// pageUrl, when the activity has its own page, adds a link to it.
+export function ActivityModal({ activity, unitSystem, onClose, pageUrl }: {
+  activity: Activity; unitSystem: UnitSystem; onClose: () => void; pageUrl?: string;
+}) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{activity.name}</h2>
+          {pageUrl && <a className="modal-page-link" href={pageUrl}>Race page →</a>}
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <ActivityDetails activity={activity} unitSystem={unitSystem} />
+        </div>
+      </div>
+    </div>
   );
 }
 

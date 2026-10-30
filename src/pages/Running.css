@@ -246,3 +246,27 @@
   /* Ensure it has a minimum height on very small screens? */
   min-height: 300px;
 }
+
+.race-back {
+  margin-bottom: 1rem;
+}
+
+.race-back a,
+.activity-name-link,
+.modal-page-link {
+  color: #a78bfa;
+}
+
+.activity-name-link {
+  text-decoration: none;
+}
+
+.activity-name-link:hover {
+  text-decoration: underline;
+}
+
+.modal-page-link {
+  margin-left: auto;
+  margin-right: 1rem;
+  white-space: nowrap;
+}

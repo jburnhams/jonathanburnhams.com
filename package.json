@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "node ./scripts/fetch-strava-data.js",
-    "build": "npm run prebuild && tsc && vite build && node ./scripts/inject-build-timestamp.js",
+    "build": "npm run prebuild && tsc && vite build && node ./scripts/inject-build-timestamp.js && node ./scripts/build-race-pages.mjs",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
