@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import PhotoCarousel from './PhotoCarousel';
 import { PHOTOS_API, slotsFor, CarouselPhoto } from './carousel';
 
@@ -17,11 +17,17 @@ function Where() {
   return <p data-testid="where">{loc.pathname + loc.search}</p>;
 }
 
+// As on the homepage: opening a photo's race navigates to /running?activity=<id>
+function HomeCarousel({ intervalMs }: { intervalMs: number }) {
+  const navigate = useNavigate();
+  return <PhotoCarousel intervalMs={intervalMs} seed="test-seed" onOpenActivity={id => navigate(`/running?activity=${id}`)} />;
+}
+
 function renderCarousel(intervalMs = 40) {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <Routes>
-        <Route path="/" element={<PhotoCarousel intervalMs={intervalMs} seed="test-seed" />} />
+        <Route path="/" element={<HomeCarousel intervalMs={intervalMs} />} />
         <Route path="/running" element={<Where />} />
       </Routes>
     </MemoryRouter>
@@ -117,5 +123,12 @@ describe('PhotoCarousel', () => {
     global.fetch = vi.fn(async () => ({ ok: false })) as unknown as typeof fetch;
     const { container } = renderCarousel();
     await waitFor(() => expect(container.querySelector('.photo-carousel')).toBeNull());
+  });
+
+  it('skips anything in the response that is not a complete photo', async () => {
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => [{ id: 1, name: 'not a photo' }, photo(0), photo(1), photo(2)] })) as unknown as typeof fetch;
+    renderCarousel(60000);
+    await waitFor(() => expect(thumbs()).toHaveLength(3));
+    expect(thumbs()[0]).toBe('https://x/api/photos/1_0?size=thumb');
   });
 });

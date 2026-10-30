@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
 import './PhotoCarousel.css';
 import { CarouselPhoto, PHOTOS_API, THUMB_WIDTH, slotsFor } from './carousel';
 
@@ -18,11 +17,13 @@ const formatDate = (d: string | null) =>
  * A row of race photos from the strava-sync API in a random order (a new seed on
  * every page load). Shows as many whole thumbnails as fit; every 10 seconds one of
  * them changes to the next photo in the sequence, which only repeats after every
- * photo has been shown. Clicking a thumbnail opens it large; clicking that opens
- * the race on the Running page.
+ * photo has been shown. Clicking a thumbnail opens it large; clicking that calls
+ * onOpenActivity with the photo's Strava activity id (the homepage navigates to
+ * /running?activity=<id>, the Running page opens the race's popup in place).
  */
-function PhotoCarousel({ intervalMs = INTERVAL_MS, seed: fixedSeed }: { intervalMs?: number; seed?: string }) {
-  const navigate = useNavigate();
+function PhotoCarousel({ onOpenActivity, intervalMs = INTERVAL_MS, seed: fixedSeed, className = '' }: {
+  onOpenActivity: (activityId: number) => void; intervalMs?: number; seed?: string; className?: string;
+}) {
   const seed = useRef(fixedSeed ?? newSeed()).current;
   const container = useRef<HTMLDivElement>(null);
   const queue = useRef<CarouselPhoto[]>([]); // every photo fetched so far, in sequence order
@@ -37,9 +38,13 @@ function PhotoCarousel({ intervalMs = INTERVAL_MS, seed: fixedSeed }: { interval
   // Fetch the next page of the sequence (one request at a time)
   const fetchMore = useCallback(() => {
     if (!fetching.current) {
-      fetching.current = fetch(`${PHOTOS_API}?${new URLSearchParams({ seed, offset: String(queue.current.length), limit: String(PAGE) })}`)
-        .then(res => (res.ok ? res.json() : Promise.reject(new Error('photos'))))
-        .then((page: CarouselPhoto[]) => { queue.current.push(...page); })
+      const url = `${PHOTOS_API}?${new URLSearchParams({ seed, offset: String(queue.current.length), limit: String(PAGE) })}`;
+      fetching.current = Promise.resolve()
+        .then(() => fetch(url))
+        .then(res => (res?.ok ? res.json() : Promise.reject(new Error('photos'))))
+        .then((page: CarouselPhoto[]) => {
+          queue.current.push(...(Array.isArray(page) ? page : []).filter(p => p && p.url && p.thumb_url && p.activity));
+        })
         .catch(() => setFailed(true))
         .finally(() => { fetching.current = null; });
     }
@@ -109,10 +114,12 @@ function PhotoCarousel({ intervalMs = INTERVAL_MS, seed: fixedSeed }: { interval
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  const openRace = (photo: CarouselPhoto) => { setOpen(null); onOpenActivity(photo.activity.id); };
+
   if (failed && slots.length === 0) return null;
 
   return (
-    <div className="photo-carousel" ref={container} aria-label="Race photos">
+    <div className={`photo-carousel ${className}`.trim()} ref={container} aria-label="Race photos">
       {slots.map((photo, i) => (
         <button
           key={i}
@@ -141,11 +148,11 @@ function PhotoCarousel({ intervalMs = INTERVAL_MS, seed: fixedSeed }: { interval
               src={open.url}
               alt={open.caption || open.activity.name || 'Race photo'}
               title="Open the race"
-              onClick={() => navigate(`/running?activity=${open.activity.id}`)}
+              onClick={() => openRace(open)}
             />
             <figcaption>
               {open.caption && <span>{open.caption} · </span>}
-              <button type="button" className="photo-carousel-race" onClick={() => navigate(`/running?activity=${open.activity.id}`)}>
+              <button type="button" className="photo-carousel-race" onClick={() => openRace(open)}>
                 {open.activity.name}
               </button>
               {open.activity.date && <span> · {formatDate(open.activity.date)}</span>}
