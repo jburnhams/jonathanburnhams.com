@@ -104,28 +104,32 @@ export class Activity {
     return { start, finish, loop: distanceMeters(start, finish) <= 50 };
   }
 
-  // `count` points evenly spaced by distance along the route (ends skipped), each
-  // with the direction of travel there in degrees clockwise from north.
-  directionArrows(count = 5): { position: [number, number]; bearing: number }[] {
+  // `count` points evenly spaced by distance along the route (ends skipped), each with the
+  // direction of travel there in degrees clockwise from north. The direction is smoothed: it is
+  // the bearing from a point `window` of the spacing before to one the same distance after, so
+  // GPS jitter and tight bends don't make a marker point off at an angle.
+  directionArrows(count = 5, window = 0.4): { position: [number, number]; bearing: number }[] {
     const pts = this.polyline;
     if (pts.length < 2) return [];
     const cumulative = [0];
     for (let i = 1; i < pts.length; i++) cumulative.push(cumulative[i - 1] + distanceMeters(pts[i - 1], pts[i]));
     const total = cumulative[cumulative.length - 1];
     if (total === 0) return [];
-    const arrows: { position: [number, number]; bearing: number }[] = [];
-    let seg = 1;
-    for (let k = 1; k <= count; k++) {
-      const target = (total * k) / (count + 1);
-      while (seg < pts.length - 1 && cumulative[seg] < target) seg++;
-      const [a, b] = [pts[seg - 1], pts[seg]];
-      const t = (target - cumulative[seg - 1]) / ((cumulative[seg] - cumulative[seg - 1]) || 1);
-      arrows.push({
-        position: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
-        bearing: bearingDegrees(a, b),
-      });
-    }
-    return arrows;
+    // The point `d` metres along the route
+    const pointAt = (d: number): [number, number] => {
+      const dist = Math.min(Math.max(d, 0), total);
+      let lo = 1, hi = pts.length - 1;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (cumulative[mid] < dist) lo = mid + 1; else hi = mid; }
+      const [p, q] = [pts[lo - 1], pts[lo]];
+      const t = (dist - cumulative[lo - 1]) / ((cumulative[lo] - cumulative[lo - 1]) || 1);
+      return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    };
+    const spacing = total / (count + 1);
+    const half = spacing * window;
+    return Array.from({ length: count }, (_, i) => {
+      const target = spacing * (i + 1);
+      return { position: pointAt(target), bearing: bearingDegrees(pointAt(target - half), pointAt(target + half)) };
+    });
   }
 
   getFormattedDistance(system: UnitSystem = 'metric'): string {

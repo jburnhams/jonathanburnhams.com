@@ -21,7 +21,7 @@ function Hero({ children }: { children?: ReactNode }) {
           <Link to="/running" className="hero-link">
             🏃‍♂️ Running 🏃‍♀️
           </Link>
-          <Link to="/training" className="hero-link">
+          <Link to="/training/" className="hero-link">
             📈 Training
           </Link>
           <a href="https://www.strava.com/athletes/jburnhams" target="_blank" rel="noopener noreferrer" className="hero-link">

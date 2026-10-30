@@ -146,4 +146,28 @@ describe('Activity Model', () => {
     a.polyline = [[51.5, -0.1]];
     expect(a.directionArrows()).toEqual([]);
   });
+
+  it('smooths the direction: a zig-zag heading north points north', () => {
+    const a = new Activity(mockActivityData);
+    // 200 points 50 m apart northwards, each swinging 40 m east or west (a GPS zig-zag)
+    a.polyline = Array.from({ length: 200 }, (_, i) => [51.5 + i * 0.00045, -0.1 + (i % 2 ? 0.0006 : -0.0006)] as [number, number]);
+    for (const { bearing } of a.directionArrows()) {
+      const off = Math.min(bearing, 360 - bearing); // angle from north
+      expect(off).toBeLessThan(5);
+    }
+    // whereas the raw segment under a marker points well off to the side
+    expect(Math.round(bearingDegrees(a.polyline[100], a.polyline[101]))).toBeGreaterThan(20);
+  });
+
+  it('follows each stretch on a winding route, not the next bend', () => {
+    const a = new Activity(mockActivityData);
+    // east for ~10 km, then a tight hairpin, then west back along a parallel line
+    const east = Array.from({ length: 100 }, (_, i) => [51.5, -0.1 + i * 0.0014] as [number, number]);
+    const west = Array.from({ length: 100 }, (_, i) => [51.502, -0.1 + (99 - i) * 0.0014] as [number, number]);
+    a.polyline = [...east, ...west];
+    const [first, , mid, , last] = a.directionArrows();
+    expect(Math.round(first.bearing)).toBe(90);
+    expect(Math.round(last.bearing)).toBe(270);
+    expect(mid.position[1]).toBeGreaterThan(0.03); // the middle one sits out near the hairpin
+  });
 });

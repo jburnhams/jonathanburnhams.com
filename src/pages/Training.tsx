@@ -7,6 +7,7 @@ import {
 import { Activity, StravaActivityJSON } from '../models/Activity';
 import { ActivityModal } from '../components/ActivityModal/ActivityModal';
 import { getJson, getSummary } from '../utils/trainingApi';
+import { getRacePages, racePageUrl } from '../utils/racePages';
 import './Running.css';
 import './Training.css';
 
@@ -77,6 +78,8 @@ const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: s
   const [racesOnly, setRacesOnly] = useState(false);
   const [races, setRaces] = useState<Map<number, Activity> | null>(null);
   const [openRace, setOpenRace] = useState<Activity | null>(null);
+  const [racePages, setRacePages] = useState<Record<string, string>>({});
+  useEffect(() => { getRacePages().then(setRacePages); }, []);
   const request = useRef(0);
 
   const raceParam = useMemo((): Record<string, string> => (includeRaces ? {} : { race: '0' }), [includeRaces]);
@@ -302,7 +305,14 @@ const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: s
         </p>
       </section>
 
-      {openRace && <ActivityModal activity={openRace} unitSystem="metric" onClose={() => setOpenRace(null)} />}
+      {openRace && (
+        <ActivityModal
+          activity={openRace}
+          unitSystem="metric"
+          onClose={() => setOpenRace(null)}
+          pageUrl={racePages[openRace.id] ? racePageUrl(racePages[openRace.id]) : undefined}
+        />
+      )}
     </div>
   );
 };
