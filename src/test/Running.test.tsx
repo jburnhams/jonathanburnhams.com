@@ -222,4 +222,14 @@ describe('Running Page', () => {
     expect(screen.getAllByTestId('circle-marker')).toHaveLength(2);
     expect(screen.getAllByTestId('route-arrow')).toHaveLength(5);
   });
+
+  it('opens the activity named in ?activity= (a link from a homepage photo)', async () => {
+    window.history.pushState({}, '', '/running?activity=2');
+    (global.fetch as any).mockResolvedValue({ ok: true, json: async () => mockActivities });
+    render(<Running />);
+    expect(await screen.findByRole('heading', { level: 2, name: 'Test Run 2' })).toBeInTheDocument();
+    fireEvent.click(screen.getByText('×'));
+    expect(window.location.search).toBe(''); // closing drops the parameter
+    window.history.pushState({}, '', '/');
+  });
 });

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import './Hero.css'
 
@@ -6,8 +7,9 @@ import './Hero.css'
  *
  * This component renders a modern, animated hero section with
  * the name "Jonathan Burnhams" and a subtle gradient effect.
+ * Anything passed as children (the photo carousel) goes under the links.
  */
-function Hero() {
+function Hero({ children }: { children?: ReactNode }) {
   return (
     <section className="hero" role="banner">
       <div className="hero-content">
@@ -32,6 +34,7 @@ function Hero() {
             👨‍💻 GitHub 💻
           </a>
         </div>
+        {children}
       </div>
     </section>
   )

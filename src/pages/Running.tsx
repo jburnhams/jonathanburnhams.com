@@ -27,11 +27,15 @@ const Running = () => {
           throw new Error('Failed to fetch activities');
         }
         const data: StravaActivityJSON[] = await response.json();
-        const parsedActivities = data
-          .map(item => new Activity(item))
+        const all = data.map(item => new Activity(item));
+        const parsedActivities = all
           .filter(activity => activity.type === 'Run' && activity.distance > 20000)
           .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
         setActivities(parsedActivities);
+        // /running?activity=<id> (e.g. from a homepage photo) opens that activity, even one not in the list
+        const linked = Number(new URLSearchParams(window.location.search).get('activity'));
+        const target = linked ? all.find(a => a.id === linked) : undefined;
+        if (target) setSelectedActivity(target);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -41,6 +45,12 @@ const Running = () => {
 
     fetchActivities();
   }, []);
+
+  // Closing drops ?activity= so a reload doesn't reopen it
+  const closeActivity = () => {
+    setSelectedActivity(null);
+    if (window.location.search.includes('activity=')) window.history.replaceState(null, '', window.location.pathname);
+  };
 
   const allPolylinesBounds = useMemo(() => {
     const allPoints = activities.flatMap(a => a.polyline);
@@ -140,7 +150,7 @@ const Running = () => {
       </table>
 
       {selectedActivity && (
-        <ActivityModal activity={selectedActivity} unitSystem={unitSystem} onClose={() => setSelectedActivity(null)} />
+        <ActivityModal activity={selectedActivity} unitSystem={unitSystem} onClose={closeActivity} />
       )}
     </div>
   );
