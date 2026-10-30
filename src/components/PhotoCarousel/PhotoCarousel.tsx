@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import './PhotoCarousel.css';
 import { CarouselPhoto, PHOTOS_API, THUMB_WIDTH, slotsFor } from './carousel';
@@ -131,7 +132,8 @@ function PhotoCarousel({ intervalMs = INTERVAL_MS, seed: fixedSeed }: { interval
         </button>
       ))}
 
-      {open && (
+      {/* Portalled to <body>: the hero's animations use transforms, which would trap position: fixed */}
+      {open && createPortal(
         <div className="photo-carousel-modal" role="dialog" aria-label={open.activity.name ?? 'Photo'} onClick={() => setOpen(null)}>
           <button className="photo-carousel-close" aria-label="Close" onClick={() => setOpen(null)}>×</button>
           <figure onClick={e => e.stopPropagation()}>
@@ -149,7 +151,8 @@ function PhotoCarousel({ intervalMs = INTERVAL_MS, seed: fixedSeed }: { interval
               {open.activity.date && <span> · {formatDate(open.activity.date)}</span>}
             </figcaption>
           </figure>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
