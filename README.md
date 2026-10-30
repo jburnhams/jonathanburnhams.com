@@ -44,6 +44,13 @@ The build process fetches Strava data automatically:
 npm run build
 ```
 
+### Testing
+
+```bash
+npm test
+npm run lint
+```
+
 ## Race pages
 
 Every run over 20 km on the Running page gets its own static page at `/running/<year>-<name>/` (e.g. `/running/2026-tor-des-geants/`; the Strava id is added only when two races would share a name and year). They are generated at build time by `scripts/build-race-pages.mjs` (after `vite build`) from the strava-sync API (`https://stravasync.jonathanburnhams.com/api/users/7828229/activities`):
@@ -59,10 +66,3 @@ curl -X POST "https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/<
 ```
 
 Keep the hook URL out of git: it is enough to trigger a deploy.
-
-### Testing
-
-```bash
-npm test
-npm run lint
-```
