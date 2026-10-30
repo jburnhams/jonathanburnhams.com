@@ -29,12 +29,12 @@ function DirectionArrows({ activity, color }: { activity: Activity; color: strin
           interactive={false}
           icon={L.divIcon({
             className: 'route-arrow',
-            iconSize: [18, 18],
-            iconAnchor: [9, 9],
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
             // An open chevron pointing up (north) before rotation: a white outline under the route colour
-            html: `<svg width="18" height="18" viewBox="0 0 18 18" style="transform: rotate(${bearing.toFixed(0)}deg)">`
-              + `<path d="M4 12 L9 6 L14 12" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`
-              + `<path d="M4 12 L9 6 L14 12" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+            html: `<svg width="26" height="26" viewBox="0 0 26 26" style="transform: rotate(${bearing.toFixed(0)}deg)">`
+              + `<path d="M6 17 L13 9 L20 17" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`
+              + `<path d="M6 17 L13 9 L20 17" fill="none" stroke="${color}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
           })}
         />
       ))}
