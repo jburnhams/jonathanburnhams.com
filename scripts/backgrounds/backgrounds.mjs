@@ -26,7 +26,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
-import { contrast, hexToOklch, oklabToOklch, oklchToHex, rgbToOklab } from "./color.mjs";
+import { contrast, hexToOklch, oklabToOklch, oklchToHex, rgbToOklab, solveLightness } from "./color.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../..");
@@ -273,10 +273,64 @@ export function exportFiles(dir) {
   return files;
 }
 
+/** Google's encoded polyline (Strava's summary_polyline) -> [lat, lng][]. */
+export function decodePolyline(str) {
+  const out = [];
+  let i = 0, lat = 0, lng = 0;
+  while (i < str.length) {
+    for (const which of [0, 1]) {
+      let shift = 0, result = 0, b;
+      do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      const d = result & 1 ? ~(result >> 1) : result >> 1;
+      if (which === 0) lat += d; else lng += d;
+    }
+    out.push([lat / 1e5, lng / 1e5]);
+  }
+  return out;
+}
+
+/**
+ * The route as an SVG path in a 100 x 100 box (equirectangular, north up, aspect kept, centred),
+ * thinned to about 120 points: enough for its shape at caption size, a few hundred bytes.
+ */
+export function routePath(points, box = 100, max = 120) {
+  if (points.length < 2) return null;
+  const midLat = points.reduce((s, p) => s + p[0], 0) / points.length;
+  const k = Math.cos((midLat * Math.PI) / 180);
+  const xy = points.map(([la, ln]) => [ln * k, -la]);
+  const xs = xy.map((p) => p[0]), ys = xy.map((p) => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const span = Math.max(x1 - x0, y1 - y0) || 1;
+  const step = Math.max(1, Math.ceil(xy.length / max));
+  const thin = xy.filter((_, i) => i % step === 0 || i === xy.length - 1);
+  const ox = (box - ((x1 - x0) / span) * box) / 2, oy = (box - ((y1 - y0) / span) * box) / 2;
+  return thin.map(([x, y], i) => `${i ? "L" : "M"}${(ox + ((x - x0) / span) * box).toFixed(1)} ${(oy + ((y - y0) / span) * box).toFixed(1)}`).join("");
+}
+
+async function raceFacts() {
+  try {
+    const { data } = await getJson(`${API}/api/users/7828229/activities`);
+    return new Map(data.map((a) => {
+      const d = a.data_json ?? {};
+      const line = d.map?.summary_polyline;
+      return [Number(d.id ?? a.id), {
+        type: d.type ?? a.type ?? null,
+        distance: d.distance ?? a.distance ?? null,
+        elevation: d.total_elevation_gain ?? a.total_elevation_gain ?? null,
+        route: line ? routePath(decodePolyline(line)) : null,
+      }];
+    }));
+  } catch (e) {
+    console.warn(`activities: ${e.message}; captions get no route`);
+    return new Map();
+  }
+}
+
 async function build(originals) {
   const selection = JSON.parse(readFileSync(SELECTION, "utf8"));
   const fromExport = originals ? exportFiles(originals) : null;
   const known = new Map((await listPhotos()).map((p) => [p.id, p]));
+  const races = await raceFacts();
   mkdirSync(OUT_IMG, { recursive: true });
   mkdirSync(OUT_SRC, { recursive: true });
   const previous = existsSync(join(OUT_SRC, "backgrounds.json")) ? JSON.parse(readFileSync(join(OUT_SRC, "backgrounds.json"), "utf8")) : [];
@@ -317,10 +371,22 @@ async function build(originals) {
     const main = colours.clusters[0].lch;
     const ink = oklchToHex([0.2, Math.min(0.045, main[1]), main[2]]);
     const meanHex = oklchToHex(colours.mean);
+    // On the ink: text near white in the ink's hue (>= 12:1), a quieter line (>= 7:1), and the
+    // photo's own colour lifted until it reads as a line and a link on the ink (>= 4.5:1).
+    const onInk = (C, h, target) => oklchToHex([solveLightness({ C, h, against: ink, target, direction: "lighter" }) ?? 0.95, C, h]);
+    const [, pC, pH] = hexToOklch(seeds.primary);
+    const inkVars = {
+      "photo-ink": ink,
+      "photo-ink-foreground": onInk(Math.min(0.02, main[1]), main[2], 12),
+      "photo-ink-muted": onInk(Math.min(0.03, main[1]), main[2], 7),
+      "photo-ink-accent": onInk(Math.min(0.16, Math.max(0.1, pC)), pH, 4.5),
+      "photo-mean": meanHex,
+    };
     const block = (sel, t) => `${sel} {\n${[
       ...Object.entries(t.roles).map(([k, v]) => `  --${k}: ${oklchCss(v)};`),
       ...Object.entries(t.ramps).flatMap(([n, s]) => s.map((v, i) => `  --${n}-${i + 1}: ${oklchCss(v)};`)),
       `  --accent: var(--secondary-3);`, `  --accent-foreground: var(--secondary-12);`,
+      ...Object.entries(inkVars).map(([k, v]) => `  --${k}: ${oklchCss(v)};`),
     ].join("\n")}\n}`;
     const entryCss = [
       `/* ${pick.id}: ${meta.activity?.name ?? ""} (${meta.activity?.date ?? ""}). Seeds ${seeds.primary} / ${seeds.secondary} (${seeds.from}), contrast ${pal.level} */`,
@@ -333,14 +399,14 @@ async function build(originals) {
       width: w, height: h,
       source,
       focus: pick.focus ?? "50% 50%",
-      activity: meta.activity,
+      activity: { ...meta.activity, ...(races.get(Number(meta.activity?.id)) ?? {}) },
       ...(meta.caption ? { caption: meta.caption } : {}),
       sizes: files,
       placeholder: `data:image/webp;base64,${placeholder.toString("base64")}`,
       colours: {
         mean: meanHex,
         ink,
-        inkText: contrast(ink, "#ffffff") >= contrast(ink, "#000000") ? "#ffffff" : "#000000",
+        inkText: inkVars["photo-ink-foreground"],
         primary: seeds.primary,
         secondary: seeds.secondary,
         from: seeds.from,
