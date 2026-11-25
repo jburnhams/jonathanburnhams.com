@@ -7,7 +7,7 @@ export interface Background {
   id: string;
   width: number;
   height: number;
-  source: 'strava-sync' | 'export';
+  source: 'strava-sync' | 'export' | 'original';
   /** object-position, so the subject survives the crop */
   focus: string;
   caption?: string;
@@ -21,21 +21,22 @@ export interface Background {
     /** the route in a 100 x 100 box, as SVG path data */
     route?: string | null;
   };
-  sizes: { width: number; avif: number; webp: number }[];
+  /** bytes per format; WebP, the fallback, stops at about 1920 px */
+  sizes: { width: number; avif: number; webp?: number }[];
   placeholder: string;
   colours: { mean: string; ink: string; inkText: string; primary: string; secondary: string };
 }
 
 export const backgrounds = manifest as unknown as Background[];
 
-/** `srcset` for one format: every width that was built. */
+/** `srcset` for one format: every width built in it. */
 export function srcSet(b: Background, format: 'avif' | 'webp'): string {
-  return b.sizes.map(s => `/backgrounds/${b.id}-${s.width}.${format} ${s.width}w`).join(', ');
+  return b.sizes.filter(s => s[format]).map(s => `/backgrounds/${b.id}-${s.width}.${format} ${s.width}w`).join(', ');
 }
 
 /** The largest WebP, for a plain `src` and for Open Graph. */
 export function largest(b: Background): string {
-  return `/backgrounds/${b.id}-${b.sizes[b.sizes.length - 1].width}.webp`;
+  return `/backgrounds/${b.id}-${b.sizes.filter(s => s.webp).at(-1)?.width}.webp`;
 }
 
 /** A background from the given race, if one of its photos is in the set. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
-import { analyse, decodePolyline, photoColours, routePath, score, seedsFrom } from './backgrounds.mjs'
+import { analyse, decodePolyline, photoColours, routePath, score, seedsFrom, webpWidths, widthsFor } from './backgrounds.mjs'
 import { firstPhotoScript } from './first-photo.mjs'
 
 const image = (bg, patch) => sharp({ create: { width: 1200, height: 800, channels: 3, background: bg } })
@@ -34,6 +34,15 @@ describe('background photos', () => {
     expect(d.startsWith('M')).toBe(true)
     for (const n of d.match(/-?[\d.]+/g).map(Number)) expect(n).toBeGreaterThanOrEqual(0), expect(n).toBeLessThanOrEqual(100)
     expect(routePath([[1, 1]])).toBeNull()
+  })
+
+  it('builds widths up to the source, and WebP only up to about 1920', () => {
+    expect(widthsFor(1200)).toEqual([640, 960, 1200])
+    expect(widthsFor(2048)).toEqual([640, 960, 1440, 2048])
+    expect(widthsFor(4618)).toEqual([640, 960, 1440, 1920, 2560, 3200])
+    expect(webpWidths(widthsFor(1200))).toEqual([640, 960, 1200])
+    expect(webpWidths(widthsFor(2048))).toEqual([640, 960, 1440, 2048])
+    expect(webpWidths(widthsFor(4618))).toEqual([640, 960, 1440, 1920])
   })
 
   it('writes a head script only when there are photos', () => {

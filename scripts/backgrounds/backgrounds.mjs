@@ -6,24 +6,27 @@
 //     full-screen background (shape, sharpness, exposure, colour) and writes a numbered contact
 //     sheet of the best to .photo-review/, to choose from by eye.
 //
-//   node scripts/backgrounds/backgrounds.mjs build [--originals <Strava export dir>]
+//   node scripts/backgrounds/backgrounds.mjs build [--photos <dir>] [--originals <Strava export dir>]
 //     For each photo in backgrounds/selection.json: AVIF and WebP at several widths (none wider
 //     than the source), a tiny blurred placeholder, and a colour scheme taken from the photo
 //     (ux-research palette.mjs, contrast-checked). Writes public/backgrounds/*.{avif,webp},
 //     src/backgrounds/backgrounds.json and src/backgrounds/palettes.css.
-//     With --originals it reads the full-size files from a Strava bulk export (activities.csv's
-//     Media column, the same ids strava-sync uses: <activity id>_<position>), so the large sizes
-//     exist; without it, the strava-sync copies, which stop at ~1200 px.
+//     Each photo is encoded from the best source given: --photos, a folder of camera originals named
+//     <id>.<ext>; else --originals, a Strava bulk export (activities.csv's Media column, the same ids
+//     strava-sync uses: <activity id>_<position>; Strava keeps 2048 px); else the strava-sync copy,
+//     which stops at ~1200 px. A photo already built from a better source than this run has is kept.
+//     The colours always come from the strava-sync copy, so they do not move with the source.
 //
 // Why these choices: AVIF is about half the bytes of WebP at the same look and every current
-// browser decodes it; WebP is the fallback for the rest. Widths step by about 1.5x so a screen
-// downloads at most ~1.5x the pixels it shows. The placeholder is the photo at 32 px, inlined in
+// browser decodes it; WebP is the fallback for the rest, so it stops at 1920. Widths step by about
+// 1.5x so a screen downloads at most ~1.5x the pixels it shows. The largest are shown on dense or
+// very large screens, where compression is harder to see, so they get a lower quality. The placeholder is the photo at 32 px, inlined in
 // the manifest, so the page shows the photo's colours on the first frame.
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { contrast, hexToOklch, oklabToOklch, oklchToHex, rgbToOklab, solveLightness } from "./color.mjs";
@@ -38,8 +41,24 @@ const OUT_IMG = join(ROOT, "public/backgrounds");
 const OUT_SRC = join(ROOT, "src/backgrounds");
 
 export const WIDTHS = [640, 960, 1440, 1920, 2560, 3200];
-const AVIF = { quality: 52, effort: 6, chromaSubsampling: "4:2:0" };
+const WEBP_MAX = 1920;
+export const avifQuality = (width) => (width <= 1440 ? 52 : width <= 1920 ? 50 : width <= 2560 ? 46 : 42);
+const avifOptions = (width) => ({ quality: avifQuality(width), effort: 6, chromaSubsampling: "4:2:0" });
 const WEBP = { quality: 74, effort: 6, smartSubsample: true };
+const IMAGES = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".tif", ".tiff"];
+
+/** The widths to build for a source this wide: the steps clearly below it, then the source itself (capped). */
+export function widthsFor(sourceWidth) {
+  const top = Math.min(sourceWidth, WIDTHS[WIDTHS.length - 1]);
+  return [...WIDTHS.filter((x) => x < top * 0.9), top];
+}
+
+/** The widths that also get a WebP: up to WEBP_MAX, or the smallest one above it when nothing reaches it. */
+export function webpWidths(widths) {
+  const small = widths.filter((x) => x <= WEBP_MAX);
+  const next = widths.find((x) => x > WEBP_MAX);
+  return next && small[small.length - 1] < WEBP_MAX * 0.9 ? [...small, next] : small;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Fetching
@@ -278,10 +297,16 @@ export function exportFiles(dir) {
   const files = new Map();
   for (const row of rows) {
     const media = (row[mediaCol] ?? "").split("|").map((f) => f.trim())
-      .filter((f) => [".jpg", ".jpeg", ".png", ".webp", ".heic", ".tif", ".tiff"].includes(extname(f).toLowerCase()));
+      .filter((f) => IMAGES.includes(extname(f).toLowerCase()));
     media.forEach((f, pos) => files.set(`${row[idCol]}_${pos}`, join(dir, f)));
   }
   return files;
+}
+
+/** id -> camera original, from a folder of files named <id>.<ext>. */
+export function photoFiles(dir) {
+  return new Map(readdirSync(dir).filter((f) => IMAGES.includes(extname(f).toLowerCase()))
+    .map((f) => [basename(f, extname(f)), join(dir, f)]));
 }
 
 /** Google's encoded polyline (Strava's summary_polyline) -> [lat, lng][]. */
@@ -337,44 +362,55 @@ async function raceFacts() {
   }
 }
 
-async function build(originals) {
+const RANK = { "strava-sync": 0, export: 1, original: 2 };
+
+/** The files for one photo, written to public/backgrounds: its size, the widths built and the placeholder. */
+async function encode(id, input, source) {
+  const m = await sharp(input).metadata();
+  const [width, height] = m.orientation >= 5 ? [m.height, m.width] : [m.width, m.height];
+  const widths = widthsFor(width);
+  const webps = webpWidths(widths);
+  for (const old of readdirSync(OUT_IMG).filter((f) => f.startsWith(`${id}-`))) rmSync(join(OUT_IMG, old));
+  // sharp converts to sRGB and drops all metadata (EXIF, GPS) unless asked to keep it
+  const sizes = await Promise.all(widths.map(async (w) => {
+    const r = sharp(input).rotate().resize({ width: w });
+    const [avif, webp] = await Promise.all([r.clone().avif(avifOptions(w)).toBuffer(), webps.includes(w) ? r.clone().webp(WEBP).toBuffer() : null]);
+    writeFileSync(join(OUT_IMG, `${id}-${w}.avif`), avif);
+    if (webp) writeFileSync(join(OUT_IMG, `${id}-${w}.webp`), webp);
+    return { width: w, avif: avif.length, ...(webp ? { webp: webp.length } : {}) };
+  }));
+  const placeholder = await sharp(input).rotate().resize({ width: 32 }).webp({ quality: 50 }).toBuffer();
+  console.log(`${id}: ${width}x${height} from ${source}, ${sizes.map((f) => `${f.width}w ${Math.round(f.avif / 1024)}k${f.webp ? `/${Math.round(f.webp / 1024)}k` : ""}`).join(", ")}`);
+  return { width, height, source, sizes, placeholder: `data:image/webp;base64,${placeholder.toString("base64")}` };
+}
+
+async function build({ photos, originals }) {
   const selection = JSON.parse(readFileSync(SELECTION, "utf8"));
-  const fromExport = originals ? exportFiles(originals) : null;
+  const sources = [["original", photos ? photoFiles(photos) : new Map()], ["export", originals ? exportFiles(originals) : new Map()]];
   const known = new Map((await listPhotos()).map((p) => [p.id, p]));
   const races = await raceFacts();
   mkdirSync(OUT_IMG, { recursive: true });
   mkdirSync(OUT_SRC, { recursive: true });
   const previous = existsSync(join(OUT_SRC, "backgrounds.json")) ? JSON.parse(readFileSync(join(OUT_SRC, "backgrounds.json"), "utf8")) : [];
+  for (const pick of selection) if (!known.has(pick.id)) throw new Error(`${pick.id} is not a photo strava-sync knows`);
+  // All at once: the encoding is the slow part, and libuv's pool (UV_THREADPOOL_SIZE) sets how many run
+  const images = new Map(await Promise.all(selection.map(async (pick) => {
+    const [source, files] = sources.find(([, f]) => f.has(pick.id) && existsSync(f.get(pick.id))) ?? ["strava-sync"];
+    // Keep a build from a better source (the workflow has no originals) rather than replace it with a small copy
+    const before = previous.find((p) => p.id === pick.id);
+    if (before && RANK[before.source] > RANK[source]) {
+      const { width, height, sizes, placeholder } = before;
+      return [pick.id, { width, height, source: before.source, sizes, placeholder }];
+    }
+    const input = files ? readFileSync(files.get(pick.id)) : await cached(pick.id, known.get(pick.id).url);
+    return [pick.id, await encode(pick.id, input, source)];
+  })));
   const manifest = [];
   const css = [];
   for (const pick of selection) {
     const meta = known.get(pick.id);
-    if (!meta) throw new Error(`${pick.id} is not a photo strava-sync knows`);
-    let input, source = "strava-sync";
-    if (fromExport?.has(pick.id) && existsSync(fromExport.get(pick.id))) {
-      input = readFileSync(fromExport.get(pick.id)); source = "export";
-    } else {
-      // Keep a full-size build already made from the export rather than replace it with the small copy
-      const before = previous.find((p) => p.id === pick.id);
-      if (before?.source === "export" && !fromExport) { manifest.push({ ...before, focus: pick.focus ?? "50% 50%" }); css.push(before.css); continue; }
-      input = await cached(pick.id, meta.url);
-    }
-    const base = sharp(input).rotate();
-    const m = await base.metadata();
-    const [w, h] = m.orientation >= 5 ? [m.height, m.width] : [m.width, m.height];
-    const widths = WIDTHS.filter((x) => x < w * 0.95);
-    widths.push(Math.min(w, WIDTHS[WIDTHS.length - 1]));
-    for (const old of readdirSync(OUT_IMG).filter((f) => f.startsWith(`${pick.id}-`))) rmSync(join(OUT_IMG, old));
-    const files = [];
-    for (const width of [...new Set(widths)]) {
-      const r = sharp(input).rotate().resize({ width });
-      const avif = await r.clone().avif(AVIF).toBuffer();
-      const webp = await r.clone().webp(WEBP).toBuffer();
-      writeFileSync(join(OUT_IMG, `${pick.id}-${width}.avif`), avif);
-      writeFileSync(join(OUT_IMG, `${pick.id}-${width}.webp`), webp);
-      files.push({ width, avif: avif.length, webp: webp.length });
-    }
-    const placeholder = await sharp(input).rotate().resize({ width: 32 }).webp({ quality: 50 }).toBuffer();
+    const { width, height, source, sizes, placeholder } = images.get(pick.id);
+    const input = await cached(pick.id, meta.url);
     const colours = await photoColours(input);
     const seeds = pick.primary ? { primary: pick.primary, secondary: pick.secondary ?? seedsFrom(colours).secondary, from: "chosen" } : seedsFrom(colours);
     const pal = palette(seeds.primary, seeds.secondary);
@@ -407,13 +443,13 @@ async function build(originals) {
     css.push(entryCss);
     manifest.push({
       id: pick.id,
-      width: w, height: h,
+      width, height,
       source,
       focus: pick.focus ?? "50% 50%",
       activity: { ...meta.activity, ...(races.get(Number(meta.activity?.id)) ?? {}) },
       ...(meta.caption ? { caption: meta.caption } : {}),
-      sizes: files,
-      placeholder: `data:image/webp;base64,${placeholder.toString("base64")}`,
+      sizes,
+      placeholder,
       colours: {
         mean: meanHex,
         ink,
@@ -425,7 +461,7 @@ async function build(originals) {
       },
       css: entryCss,
     });
-    console.log(`${pick.id}: ${w}x${h} from ${source}, ${files.map((f) => `${f.width}w ${Math.round(f.avif / 1024)}k/${Math.round(f.webp / 1024)}k`).join(", ")}; seeds ${seeds.primary} ${seeds.secondary}`);
+    console.log(`${pick.id}: seeds ${seeds.primary} ${seeds.secondary}`);
   }
   writeFileSync(join(OUT_SRC, "backgrounds.json"), JSON.stringify(manifest, null, 1) + "\n");
   writeFileSync(join(OUT_SRC, "palettes.css"), `/* Generated by scripts/backgrounds/backgrounds.mjs from each background photo; do not edit.\n   Every block is ux-research palette.mjs output for the photo's own colours (see seedsFrom). */\n\n${css.join("\n\n")}\n`);
@@ -435,7 +471,7 @@ async function build(originals) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [cmd, ...rest] = process.argv.slice(2);
-  const at = rest.indexOf("--originals");
-  const run = cmd === "review" ? review() : cmd === "build" ? build(at >= 0 ? rest[at + 1] : undefined) : Promise.reject(new Error("usage: backgrounds.mjs review | build [--originals <export dir>]"));
+  const option = (name) => (rest.includes(name) ? rest[rest.indexOf(name) + 1] : undefined);
+  const run = cmd === "review" ? review() : cmd === "build" ? build({ photos: option("--photos"), originals: option("--originals") }) : Promise.reject(new Error("usage: backgrounds.mjs review | build [--photos <dir>] [--originals <export dir>]"));
   run.catch((e) => { console.error(e.message ?? e); process.exit(1); });
 }

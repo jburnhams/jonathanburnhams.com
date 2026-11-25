@@ -8,12 +8,21 @@
 
 Change this file and the **Background photos** workflow rebuilds them on the branch (it can reach
 strava-sync; it commits `public/backgrounds/`, `src/backgrounds/backgrounds.json` and
-`src/backgrounds/palettes.css`). Those copies stop at ~1200 px. For full size, run the build
-against a Strava bulk export on a machine that has it:
+`src/backgrounds/palettes.css`). Those copies stop at ~1200 px. For full size,
+run the build on a machine that has the originals:
 
 ```bash
-node scripts/backgrounds/backgrounds.mjs build --originals ~/Downloads/strava-export
+UV_THREADPOOL_SIZE=12 node scripts/backgrounds/backgrounds.mjs build \
+  --photos <camera originals, named <id>.jpg> --originals <Strava export dir>
 ```
 
-A photo built from the export is kept on later workflow runs (they have no export), so the
-full-size files are not replaced by the small ones.
+- `--photos` wins: the files as the camera made them (3456 to 4618 px). They must be JPEG, PNG
+  or TIFF (sharp cannot read real HEIC; convert it first). Links work, so a folder of symlinks
+  into a photo archive is enough.
+- `--originals` covers the rest: a Strava bulk export, which keeps 2048 px at most.
+- The colours come from strava-sync's copy whatever the source, so a rebuild does not change them.
+
+A photo built from a better source is kept on later workflow runs (they have no originals), so the
+full-size files are not replaced by the small ones. `source` in `backgrounds.json` says which each
+one used. To add a photo at full size, rebuild with its original; without the other originals the
+rest are kept as they are.
