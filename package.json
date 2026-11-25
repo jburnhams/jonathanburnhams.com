@@ -6,13 +6,13 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "node ./scripts/fetch-strava-data.js",
-    "build": "npm run prebuild && tsc && vite build && node ./scripts/inject-build-timestamp.js && node ./scripts/build-race-pages.mjs",
+    "build": "npm run prebuild && npm run type-check && vite build && node ./scripts/inject-build-timestamp.js && node ./scripts/build-race-pages.mjs",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "type-check": "tsc --noEmit"
+    "type-check": "node node_modules/typescript7/bin/tsc --noEmit"
   },
   "dependencies": {
     "@mapbox/polyline": "^1.2.1",

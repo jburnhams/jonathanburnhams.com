@@ -70,3 +70,17 @@ export function usePhotoPalette(b: Background | undefined) {
     };
   }, [b]);
 }
+
+const SESSION_KEY = 'photo';
+
+/** Remembers the photo the visitor last saw, so the next page keeps its colours (sessionStorage; carries on without it). */
+export function rememberPhoto(b: Background | undefined) {
+  try { if (b) sessionStorage.setItem(SESSION_KEY, b.id); } catch { /* storage blocked */ }
+}
+
+/** The photo for a page with no race of its own: the one last seen this visit, else the first in the set. */
+export function sessionPhoto(): Background | undefined {
+  let id: string | null = null;
+  try { id = sessionStorage.getItem(SESSION_KEY); } catch { /* storage blocked */ }
+  return backgrounds.find(b => b.id === id) ?? backgrounds[0];
+}

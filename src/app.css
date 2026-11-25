@@ -1,0 +1,53 @@
+/* The site's styles: strata-react's contract and default look, then one palette per background
+   photo (generated; see DESIGN.md), then the few things the site draws itself. */
+@import "tailwindcss";
+@import "strata-react/strata.css";
+@import "./backgrounds/palettes.css";
+
+@theme inline {
+  /* The solid panel the words sit on over a photo, and its inks, from the photo (palettes.css).
+     Before a photo is chosen they are strata's own dark ground and inks. */
+  --color-ink: var(--photo-ink, oklch(20% 0.02 216));
+  --color-ink-foreground: var(--photo-ink-foreground, oklch(96% 0.01 216));
+  --color-ink-muted: var(--photo-ink-muted, oklch(78% 0.015 216));
+  --color-ink-accent: var(--photo-ink-accent, oklch(80% 0.14 78));
+}
+
+/* His name on the homepage: Instrument Sans at the narrow end of its width axis, heavy and very
+   large, the way race signage sets a name (DESIGN.md, Typography). Clamped so it fits a phone on
+   two lines and never passes ~9rem. */
+@utility type-name {
+  font-family: var(--font-display);
+  font-size: clamp(3.25rem, 1.5rem + 7.5vw, 9rem);
+  line-height: 0.88;
+  font-weight: 700;
+  font-stretch: 75%;
+  letter-spacing: -0.015em;
+}
+
+/* The photo's fade-in once decoded: an ordinary effect, opacity only (DESIGN.md, Motion). */
+@utility photo-fade {
+  transition-property: opacity;
+  transition-duration: 250ms;
+  transition-timing-function: var(--ease-effects);
+  @media (prefers-reduced-motion: reduce) { transition-duration: 0s; }
+}
+
+@layer base {
+  html, body { background-color: var(--background); }
+}
+
+/* On a phone the photo takes the top of the screen and the panel runs under it (DESIGN.md, Layout). */
+@utility photo-band { height: 62svh; }
+
+/* His name in the header of the other pages: the homepage's voice at heading size. */
+@utility type-name-sm {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+  font-stretch: 75%;
+}
+
+/* The Running map: most of a laptop screen, never so tall that the list is out of reach. */
+@utility map-tall { height: min(60svh, 32rem); }

@@ -25,13 +25,14 @@ export interface TrainingPeriod {
 
 export type Period = 'week' | 'month' | 'year';
 
-// The API's sports, grouped for charts and filters
+// The API's sports, grouped for charts and filters. Colours are the page palette's chart roles
+// (contrast- and colour-blindness-checked by palette.mjs); Other is the muted ink.
 export const SPORT_GROUPS: { key: string; label: string; color: string; sports: string[] }[] = [
-  { key: 'run', label: 'Run', color: '#e8590c', sports: ['run', 'trail_run', 'ultra_run', 'treadmill_run'] },
-  { key: 'ride', label: 'Ride', color: '#1c7ed6', sports: ['ride', 'indoor_ride'] },
-  { key: 'swim', label: 'Swim', color: '#12b886', sports: ['swim', 'open_water_swim'] },
-  { key: 'hike', label: 'Hike / Walk', color: '#ae3ec9', sports: ['hike', 'walk'] },
-  { key: 'other', label: 'Other', color: '#868e96', sports: [] },
+  { key: 'run', label: 'Run', color: 'var(--chart-1)', sports: ['run', 'trail_run', 'ultra_run', 'treadmill_run'] },
+  { key: 'ride', label: 'Ride', color: 'var(--chart-2)', sports: ['ride', 'indoor_ride'] },
+  { key: 'swim', label: 'Swim', color: 'var(--chart-3)', sports: ['swim', 'open_water_swim'] },
+  { key: 'hike', label: 'Hike / Walk', color: 'var(--chart-4)', sports: ['hike', 'walk'] },
+  { key: 'other', label: 'Other', color: 'var(--muted-foreground)', sports: [] },
 ];
 
 export function sportGroup(sport: string) {

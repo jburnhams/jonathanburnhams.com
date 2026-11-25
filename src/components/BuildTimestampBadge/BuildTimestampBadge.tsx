@@ -1,13 +1,11 @@
-import './BuildTimestampBadge.css'
 import { getBuildTimestamp } from '../../utils/getBuildTimestamp'
 
+/** When the site was last built, filled in after load by hydrateBuildTimestampBadges (it changes on every deploy). */
 function BuildTimestampBadge() {
-  const buildTimestamp = getBuildTimestamp()
-
   return (
-    <div className="build-timestamp" data-build-timestamp={buildTimestamp}>
+    <p className="type-caption text-ink-muted md:text-end" data-build-timestamp={getBuildTimestamp()}>
       Build timestamp unavailable
-    </div>
+    </p>
   )
 }
 

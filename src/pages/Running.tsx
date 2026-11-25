@@ -1,187 +1,115 @@
-import { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Polyline } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import { Activity, StravaActivityJSON, UnitSystem } from '../models/Activity';
-import { ActivityModal, FitBounds } from '../components/ActivityModal/ActivityModal';
-import PhotoCarousel from '../components/PhotoCarousel/PhotoCarousel';
-import { getRacePages, racePageUrl } from '../utils/racePages';
-import './Running.css';
+// Running. One question: "What has he raced?" Finding: how many races over 20 km, how far and how
+// much climbing in all, and the longest. Then where they were (one map of every route; choosing a
+// route opens its race page) and the list (newest first, every column sortable, units in the URL).
+import { useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router';
+import { DataTable, DataView, EmptyState, Skeleton, TextLink, ToggleGroup, format, useSearchParam } from 'strata-react';
+import { RouteMap, type MapRoute } from 'strata-react/map';
+import { sessionPhoto, usePhotoPalette } from '../backgrounds';
+import { PhotoBand, PlainBand } from '../components/PhotoBand';
+import { isRace, useActivities } from '../data/activities';
+import type { Activity, UnitSystem } from '../models/Activity';
+import { racePageUrl, useRacePages } from '../utils/racePages';
 
-const getColorForActivity = (id: number): string => {
-  // Simple hash function to generate a consistent color
-  const hash = id * 2654435761 % 2 ** 32;
-  const hue = hash % 360;
-  return `hsl(${hue}, 70%, 45%)`;
+export const TILES = {
+  light: {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  },
 };
 
-const Running = () => {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
-  // Every activity from the API (not only the listed runs), so a photo of any race can open its popup
-  const [allById, setAllById] = useState<Map<number, Activity>>(new Map());
-  // Strava id -> race page slug (built with the site); empty in dev or if the build couldn't fetch them
-  const [racePages, setRacePages] = useState<Record<string, string>>({});
-  const pageFor = (id: number) => (racePages[id] ? racePageUrl(racePages[id]) : undefined);
+const UNITS = [{ value: 'metric', label: 'Kilometres' }, { value: 'imperial', label: 'Miles' }] as const;
 
-  useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        const response = await fetch('https://stravasync.jonathanburnhams.com/api/users/7828229/activities');
-        if (!response.ok) {
-          throw new Error('Failed to fetch activities');
-        }
-        const [data, slugs] = await Promise.all([response.json() as Promise<StravaActivityJSON[]>, getRacePages()]);
-        setRacePages(slugs);
-        const all = data.map(item => new Activity(item));
-        const parsedActivities = all
-          .filter(activity => activity.type === 'Run' && activity.distance > 20000)
-          .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
-        setActivities(parsedActivities);
-        setAllById(new Map(all.map(a => [a.id, a])));
-        // /running?activity=<id> (e.g. from a homepage photo) opens that activity, even one not in the list
-        const linked = Number(new URLSearchParams(window.location.search).get('activity'));
-        if (linked && slugs[linked]) {
-          window.location.replace(racePageUrl(slugs[linked])); // old links now go to the race's own page
-          return;
-        }
-        const target = linked ? all.find(a => a.id === linked) : undefined;
-        if (target) setSelectedActivity(target);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
+export function raceFinding(races: Activity[]): string | null {
+  if (!races.length) return null;
+  const km = races.reduce((s, a) => s + a.distance, 0);
+  const climb = races.reduce((s, a) => s + a.elevationGain, 0);
+  const first = Math.min(...races.map(a => a.startDate.getFullYear()));
+  const longest = races.reduce((l, a) => (a.distance > l.distance ? a : l));
+  return `${format.count(races.length, 'race')} over 20 km since ${first}: ${format.distance(km)} and ${format.integer(Math.round(climb))} m of climbing. The longest was ${longest.name}, ${format.distance(longest.distance)}.`;
+}
 
-    fetchActivities();
-  }, []);
-
-  // Closing drops ?activity= so a reload doesn't reopen it
-  const closeActivity = () => {
-    setSelectedActivity(null);
-    if (window.location.search.includes('activity=')) window.history.replaceState(null, '', window.location.pathname);
-  };
-
-  const allPolylinesBounds = useMemo(() => {
-    const allPoints = activities.flatMap(a => a.polyline);
-    if (allPoints.length === 0) return undefined;
-
-    // Calculate bounds manually to avoid L dependency if possible, or just pass all points to fitBounds
-    // But fitBounds expects a LatLngBoundsExpression which can be an array of LatLngs.
-    // However, creating a huge array might be heavy. Let's find min/max.
-    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-
-    allPoints.forEach(([lat, lng]) => {
-      if (lat < minLat) minLat = lat;
-      if (lat > maxLat) maxLat = lat;
-      if (lng < minLng) minLng = lng;
-      if (lng > maxLng) maxLng = lng;
-    });
-
-    return [[minLat, minLng], [maxLat, maxLng]] as [[number, number], [number, number]];
-  }, [activities]);
-
-  if (loading) return <div className="running-page">Loading activities...</div>;
-  if (error) return <div className="running-page">Error: {error}</div>;
-
+function RaceTable({ races, units, slugs }: { races: Activity[]; units: UnitSystem; slugs: Record<string, string> }) {
   return (
-    <div className="running-page">
-      <header className="running-header">
-        <div className="header-content">
-          <h1>Running Activities</h1>
-          <div className="unit-toggle">
-            <button
-              className={`toggle-btn ${unitSystem === 'metric' ? 'active' : ''}`}
-              onClick={() => setUnitSystem('metric')}
-            >
-              Metric
-            </button>
-            <button
-              className={`toggle-btn ${unitSystem === 'imperial' ? 'active' : ''}`}
-              onClick={() => setUnitSystem('imperial')}
-            >
-              Imperial
-            </button>
-          </div>
-        </div>
-      </header>
+    <DataTable
+      caption="Races over 20 km"
+      rows={races}
+      rowKey={a => String(a.id)}
+      initialSort={{ key: 'date', dir: 'descending' }}
+      sortParam="sort"
+      columns={[
+        { key: 'date', header: 'Date', value: a => a.startDate, cell: a => format.date(a.startDate) },
+        {
+          key: 'name', header: 'Race', value: a => a.name, truncate: true,
+          cell: a => (slugs[a.id] ? <TextLink to={racePageUrl(slugs[a.id])}>{a.name}</TextLink> : a.name),
+        },
+        { key: 'distance', header: 'Distance', numeric: true, value: a => a.distance, cell: a => a.getFormattedDistance(units) },
+        { key: 'time', header: 'Moving time', numeric: true, value: a => a.movingTime, cell: a => a.formattedMovingTime },
+        { key: 'pace', header: 'Pace', numeric: true, value: a => a.averageSpeed ? 1 / a.averageSpeed : null, cell: a => a.getFormattedPace(units) },
+        { key: 'climb', header: 'Climb', numeric: true, value: a => a.elevationGain, cell: a => a.getFormattedElevation(units) },
+      ]}
+    />
+  );
+}
 
-      <PhotoCarousel
-        className="running-carousel"
-        onOpenActivity={id => {
-          const url = pageFor(id);
-          if (url) window.location.assign(url);
-          else { const a = allById.get(id); if (a) setSelectedActivity(a); }
-        }}
-      />
+function RaceMap({ races, slugs }: { races: Activity[]; slugs: Record<string, string> }) {
+  const navigate = useNavigate();
+  const routes = useMemo<MapRoute[]>(
+    () => races.filter(a => a.polyline.length > 1).map(a => ({ id: String(a.id), label: `${a.name}, ${a.startDate.getFullYear()}`, points: a.polyline })),
+    [races],
+  );
+  if (!routes.length) return null;
+  return (
+    <RouteMap
+      label={`Routes of ${format.count(routes.length, 'race')}`}
+      routes={routes}
+      tiles={TILES}
+      onSelect={id => { if (slugs[id]) navigate(racePageUrl(slugs[id])); }}
+      className="map-tall aspect-auto"
+    />
+  );
+}
 
-      {/* Main Map with all activities */}
-      <div className="all-activities-map-container">
-         <MapContainer
-            bounds={allPolylinesBounds}
-            zoom={13}
-            scrollWheelZoom={false}
-            style={{ height: '100%', width: '100%' }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            {activities.map(activity => (
-              activity.polyline.length > 0 && (
-                <Polyline
-                  key={activity.id}
-                  positions={activity.polyline}
-                  pathOptions={{ color: getColorForActivity(activity.id) }}
-                  eventHandlers={{
-                    click: () => setSelectedActivity(activity)
-                  }}
-                />
-              )
-            ))}
-            <FitBounds bounds={allPolylinesBounds} />
-          </MapContainer>
+const Running = () => {
+  const photo = sessionPhoto();
+  usePhotoPalette(photo);
+  const activities = useActivities();
+  const slugs = useRacePages();
+  const [units] = useSearchParam('units', { default: 'metric', parse: raw => raw === 'metric' || raw === 'imperial' });
+  const races = useMemo(
+    () => (activities.status === 'ready' ? activities.data.filter(isRace).sort((a, b) => b.startDate.getTime() - a.startDate.getTime()) : []),
+    [activities],
+  );
+  const finding = raceFinding(races);
+  // Old links (/running?activity=<id>, from before race pages) go to the race's own page
+  const navigate = useNavigate();
+  const [linked] = useSearchParam('activity', { default: '' });
+  useEffect(() => { if (linked && slugs[linked]) navigate(racePageUrl(slugs[linked]), { replace: true }); }, [linked, slugs, navigate]);
+  return (
+    <>
+      {photo ? <PhotoBand photo={photo} title="Running">{finding}</PhotoBand> : <PlainBand title="Running">{finding}</PlainBand>}
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 md:px-8">
+        <DataView
+          state={activities}
+          isEmpty={all => all.filter(isRace).length === 0}
+          skeleton={<div className="grid gap-8"><Skeleton className="h-96" /><Skeleton className="h-64" /></div>}
+          empty={<EmptyState title="No races yet">Runs over 20 km appear here once they are in the Strava export that strava-sync loads.</EmptyState>}
+        >
+          {() => (
+            <>
+              <RaceMap races={races} slugs={slugs} />
+              <section aria-labelledby="races" className="grid gap-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <h2 id="races" className="type-heading">Every race</h2>
+                  <ToggleGroup label="Units" options={UNITS} param="units" size="sm" />
+                </div>
+                <RaceTable races={races} units={units as UnitSystem} slugs={slugs} />
+              </section>
+            </>
+          )}
+        </DataView>
       </div>
-
-      <table className="activities-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Name</th>
-            <th>Distance</th>
-            <th>Time</th>
-            <th>Pace</th>
-            <th>Elevation</th>
-          </tr>
-        </thead>
-        <tbody>
-          {activities.map(activity => (
-            <tr
-              key={activity.id}
-              onClick={() => { const url = pageFor(activity.id); if (url) window.location.assign(url); else setSelectedActivity(activity); }}
-            >
-              <td>{activity.formattedDate}</td>
-              <td>
-                {pageFor(activity.id)
-                  ? <a className="activity-name-link" href={pageFor(activity.id)} onClick={e => e.stopPropagation()}>{activity.name}</a>
-                  : activity.name}
-              </td>
-              <td>{activity.getFormattedDistance(unitSystem)}</td>
-              <td>{activity.formattedMovingTime}</td>
-              <td>{activity.getFormattedPace(unitSystem)}</td>
-              <td>{activity.getFormattedElevation(unitSystem)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {selectedActivity && (
-        <ActivityModal activity={selectedActivity} unitSystem={unitSystem} onClose={closeActivity} pageUrl={pageFor(selectedActivity.id)} />
-      )}
-    </div>
+    </>
   );
 };
 
