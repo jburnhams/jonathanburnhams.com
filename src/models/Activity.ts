@@ -37,9 +37,9 @@ export interface StravaActivityJSON {
     };
     description?: string;
     photos?: ActivityPhoto[];
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export class Activity {
