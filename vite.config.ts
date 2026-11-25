@@ -24,5 +24,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: false,
+    // strata-react/map imports Leaflet's stylesheet; inlined, Vite handles the CSS import
+    server: { deps: { inline: ['strata-react'] } },
   },
 })

@@ -1,273 +1,55 @@
+import { screen, within, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, beforeEach } from 'vitest'
+import { http, HttpResponse } from 'msw'
+import { renderRoutes } from 'strata-react/testing'
+import { routes } from '../routes'
+import { ACTIVITIES_API } from '../data/activities'
+import { clearRacePagesCache } from '../utils/racePages'
+import { server } from './server'
 
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import Running from '../pages/Running';
-import { clearRacePagesCache } from '../utils/racePages';
+beforeEach(() => clearRacePagesCache())
 
-// Mock react-leaflet
-vi.mock('react-leaflet', () => {
-  const MockMapContainer = ({ children, bounds }: { children: React.ReactNode, bounds?: any }) => (
-    <div data-testid="map-container" data-bounds={JSON.stringify(bounds)}>
-      {children}
-    </div>
-  );
+describe('Running', () => {
+  it('opens with the finding: how many races, how far, and the longest', async () => {
+    renderRoutes(routes, { route: '/running' })
+    expect(await screen.findByText(/2\sraces over 20\skm since 2022/)).toBeInTheDocument()
+    expect(screen.getByText(/The longest was Cape Wrath Ultra 2022/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Running' })).toBeInTheDocument()
+  })
 
-  const MockPolyline = ({ eventHandlers }: { eventHandlers?: any }) => (
-    <div
-      data-testid="polyline"
-      onClick={eventHandlers?.click}
-    />
-  );
+  it('lists races over 20 km, newest first, each linked to its race page', async () => {
+    renderRoutes(routes, { route: '/running' })
+    const table = await screen.findByRole('grid', { name: 'Races over 20 km' })
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(2) // the 5 km parkrun is not a race
+    expect(within(rows[0]).getByRole('link', { name: 'Tor Des Geants' })).toHaveAttribute('href', '/running/2026-tor-des-geants/')
+    expect(within(rows[1]).getByText('Cape Wrath Ultra 2022')).toBeInTheDocument()
+  })
 
-  return {
-    MapContainer: MockMapContainer,
-    TileLayer: () => <div data-testid="tile-layer" />,
-    Polyline: MockPolyline,
-    CircleMarker: ({ children, center }: { children?: React.ReactNode, center: [number, number] }) => (
-      <div data-testid="circle-marker" data-center={JSON.stringify(center)}>{children}</div>
-    ),
-    Marker: ({ icon }: { icon?: { options?: { className?: string } } }) => <div data-testid={icon?.options?.className ?? 'marker'} />,
-    Tooltip: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
-    useMap: () => ({
-      fitBounds: vi.fn(),
-    }),
-  };
-});
+  it('switches units, and keeps the choice in the URL', async () => {
+    const user = userEvent.setup()
+    const { router } = renderRoutes(routes, { route: '/running' })
+    const table = await screen.findByRole('grid', { name: 'Races over 20 km' })
+    expect(within(table).getByText('358.70 km')).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'Miles' }))
+    expect(await within(table).findByText('222.89 mi')).toBeInTheDocument()
+    expect(router.state.location.search).toBe('?units=imperial')
+  })
 
-// Mock fetch
-global.fetch = vi.fn();
+  it('draws every race route on the map', async () => {
+    renderRoutes(routes, { route: '/running' })
+    expect(await screen.findByText(/^Map with 2 routes\. Tor Des Geants, 2026/)).toBeInTheDocument()
+  })
 
-describe('Running Page', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    clearRacePagesCache();
-  });
+  it('sends old ?activity= links to the race page', async () => {
+    const { router } = renderRoutes(routes, { route: '/running?activity=20235667026' })
+    await waitFor(() => expect(router.state.location.pathname).toBe('/running/2026-tor-des-geants/'))
+  })
 
-  const mockActivities = [
-    {
-      id: 1,
-      name: 'Test Run 1',
-      type: 'Run',
-      start_date: '2023-01-01T10:00:00Z',
-      distance: 25000,
-      moving_time: 7200,
-      total_elevation_gain: 50,
-      average_speed: 2.77,
-      data_json: {
-        id: 1,
-        name: 'Test Run 1',
-        type: 'Run',
-        start_date_local: '2023-01-01T10:00:00Z',
-        distance: 25000,
-        moving_time: 7200,
-        total_elevation_gain: 50,
-        average_speed: 2.77,
-        map: { summary_polyline: 'encoded_polyline' } // This will be decoded by mapboxPolyline
-      }
-    },
-    {
-      id: 2,
-      name: 'Test Run 2',
-      type: 'Run',
-      start_date: '2023-01-02T10:00:00Z',
-      distance: 30000,
-      moving_time: 9000,
-      total_elevation_gain: 100,
-      average_speed: 2.77,
-      data_json: {
-        id: 2,
-        name: 'Test Run 2',
-        type: 'Run',
-        start_date_local: '2023-01-02T10:00:00Z',
-        distance: 30000,
-        moving_time: 9000,
-        total_elevation_gain: 100,
-        average_speed: 2.77,
-        map: { summary_polyline: 'encoded_polyline_2' }
-      }
-    }
-  ];
-
-  // We need to mock mapboxPolyline.decode since it's used in Activity constructor
-  vi.mock('@mapbox/polyline', () => ({
-    default: {
-      decode: () => [[0, 0], [1, 1]] // Mock decoding to some points
-    }
-  }));
-
-  it('renders loading state initially', () => {
-    (global.fetch as any).mockImplementationOnce(() => new Promise(() => {})); // Never resolves
-    render(<Running />);
-    expect(screen.getByText(/Loading activities/i)).toBeInTheDocument();
-  });
-
-  it('renders activities table after fetch', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockActivities,
-    });
-
-    render(<Running />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Run 1')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('25.00 km')).toBeInTheDocument();
-  });
-
-  it('renders the all-activities map', async () => {
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockActivities,
-    });
-
-    render(<Running />);
-
-    await waitFor(() => {
-        const maps = screen.getAllByTestId('map-container');
-        expect(maps.length).toBeGreaterThan(0);
-    });
-  });
-
-  it('renders polylines for each activity on the main map', async () => {
-     (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockActivities,
-    });
-
-    render(<Running />);
-
-    await waitFor(() => {
-       const polylines = screen.getAllByTestId('polyline');
-       // Assuming 2 activities, so 2 polylines on the main map.
-       expect(polylines).toHaveLength(2);
-    });
-  });
-
-  it('opens modal when clicking a polyline', async () => {
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockActivities,
-    });
-
-    render(<Running />);
-
-    await waitFor(() => {
-       expect(screen.getAllByTestId('polyline').length).toBe(2);
-    });
-
-    const polylines = screen.getAllByTestId('polyline');
-
-    // Click the first polyline
-    fireEvent.click(polylines[0]);
-
-    await waitFor(() => {
-       // Check for modal overlay
-       const modalOverlay = screen.getByText('×'); // Close button is a good indicator
-       expect(modalOverlay).toBeInTheDocument();
-
-       // Check that the modal title matches the activity name
-       // Note: mockActivities[0] is 'Test Run 1' but activities are sorted by date descending in the component
-       // 'Test Run 2' is newer (02/01/2023) than 'Test Run 1' (01/01/2023).
-       // So activities[0] in render loop (and thus polylines[0]) should correspond to 'Test Run 2'.
-       expect(screen.getByRole('heading', { level: 2, name: 'Test Run 2' })).toBeInTheDocument();
-    });
-  });
-
-  it('handles fetch error', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: false,
-    });
-
-    render(<Running />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Error:/i)).toBeInTheDocument();
-    });
-  });
-
-  it('shows the description and photos in the modal, and opens a photo large', async () => {
-    const withPhotos = [{
-      ...mockActivities[0],
-      data_json: {
-        ...mockActivities[0].data_json,
-        description: 'Great day\n<b>not bold</b>',
-        photos: [{ id: '1_0', width: 1200, height: 800, url: 'https://x/api/photos/1_0', thumb_url: 'https://x/api/photos/1_0?size=thumb' }],
-      },
-    }];
-    (global.fetch as any).mockResolvedValue({ ok: true, json: async () => withPhotos });
-
-    render(<Running />);
-    fireEvent.click(await screen.findByText('Test Run 1'));
-
-    const description = await screen.findByText(/Great day/);
-    expect(description.textContent).toBe('Great day\n<b>not bold</b>'); // text, not HTML
-    expect(description.querySelector('b')).toBeNull();
-
-    const thumb = screen.getByRole('img', { name: 'Test Run 1' });
-    expect(thumb).toHaveAttribute('src', 'https://x/api/photos/1_0?size=thumb');
-    expect(thumb).toHaveAttribute('loading', 'lazy');
-
-    fireEvent.click(thumb);
-    const large = screen.getAllByRole('img', { name: 'Test Run 1' }).find(img => img.getAttribute('src') === 'https://x/api/photos/1_0');
-    expect(large).toBeDefined();
-  });
-
-  it('marks the start and finish on the activity map', async () => {
-    (global.fetch as any).mockResolvedValue({ ok: true, json: async () => mockActivities });
-    render(<Running />);
-    fireEvent.click(await screen.findByText('Test Run 1'));
-    // mapbox polyline decodes the mock strings to distinct points, so this is not a loop
-    await screen.findByText('Start');
-    expect(screen.getByText('Finish')).toBeInTheDocument();
-    expect(screen.getAllByTestId('circle-marker')).toHaveLength(2);
-    expect(screen.getAllByTestId('route-arrow')).toHaveLength(5);
-  });
-
-  it('opens the activity named in ?activity= (a link from a homepage photo)', async () => {
-    window.history.pushState({}, '', '/running?activity=2');
-    (global.fetch as any).mockResolvedValue({ ok: true, json: async () => mockActivities });
-    render(<Running />);
-    expect(await screen.findByRole('heading', { level: 2, name: 'Test Run 2' })).toBeInTheDocument();
-    fireEvent.click(screen.getByText('×'));
-    expect(window.location.search).toBe(''); // closing drops the parameter
-    window.history.pushState({}, '', '/');
-  });
-
-  it('shows race photos under the title, and a photo opens its race in place', async () => {
-    const photo = { id: '2_0', width: 1200, height: 800, url: 'https://x/api/photos/2_0', thumb_url: 'https://x/api/photos/2_0?size=thumb',
-      activity: { id: 2, name: 'Test Run 2', date: '2023-01-02' } };
-    (global.fetch as any).mockImplementation(async (url: string) => ({
-      ok: true, json: async () => (url.includes('/api/photos/random') ? [photo] : mockActivities),
-    }));
-    render(<Running />);
-    await screen.findByText('Test Run 1');
-    const [thumb] = await screen.findAllByRole('img', { name: 'Test Run 2' });
-    expect(thumb).toHaveAttribute('src', 'https://x/api/photos/2_0?size=thumb');
-    expect(thumb.closest('.photo-carousel')!.compareDocumentPosition(screen.getAllByTestId('map-container')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // above the map
-    fireEvent.click(thumb);
-    fireEvent.click(screen.getByRole('dialog').querySelector('img')!);
-    expect(await screen.findByRole('heading', { level: 2, name: 'Test Run 2' })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/'); // no navigation
-  });
-
-  it('links each run to its race page, and sends old ?activity= links there', async () => {
-    (global.fetch as any).mockImplementation(async (url: string) => ({
-      ok: true, json: async () => (url === '/race-pages.json' ? { 1: '2023-test-run-1' } : mockActivities),
-    }));
-    render(<Running />);
-    expect(await screen.findByRole('link', { name: 'Test Run 1' })).toHaveAttribute('href', '/running/2023-test-run-1/');
-    expect(screen.queryByRole('link', { name: 'Test Run 2' })).toBeNull(); // no page: the row opens the popup
-
-    const replace = vi.fn();
-    const original = window.location;
-    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, search: '?activity=1', replace, pathname: '/running' } });
-    try {
-      render(<Running />);
-      await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/running/2023-test-run-1/'));
-    } finally {
-      Object.defineProperty(window, 'location', { configurable: true, value: original });
-    }
-  });
-});
+  it('says what failed when strava-sync cannot be read', async () => {
+    server.use(http.get(ACTIVITIES_API, () => new HttpResponse(null, { status: 503 })))
+    renderRoutes(routes, { route: '/running' })
+    expect(await screen.findByRole('alert')).toHaveTextContent('The race list could not be read from strava-sync')
+  })
+})

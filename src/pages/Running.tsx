@@ -8,26 +8,11 @@ import { RouteMap, type MapRoute } from 'strata-react/map';
 import { sessionPhoto, usePhotoPalette } from '../backgrounds';
 import { PhotoBand, PlainBand } from '../components/PhotoBand';
 import { isRace, useActivities } from '../data/activities';
+import { TILES, raceFinding } from '../data/races';
 import type { Activity, UnitSystem } from '../models/Activity';
 import { racePageUrl, useRacePages } from '../utils/racePages';
 
-export const TILES = {
-  light: {
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  },
-};
-
 const UNITS = [{ value: 'metric', label: 'Kilometres' }, { value: 'imperial', label: 'Miles' }] as const;
-
-export function raceFinding(races: Activity[]): string | null {
-  if (!races.length) return null;
-  const km = races.reduce((s, a) => s + a.distance, 0);
-  const climb = races.reduce((s, a) => s + a.elevationGain, 0);
-  const first = Math.min(...races.map(a => a.startDate.getFullYear()));
-  const longest = races.reduce((l, a) => (a.distance > l.distance ? a : l));
-  return `${format.count(races.length, 'race')} over 20 km since ${first}: ${format.distance(km)} and ${format.integer(Math.round(climb))} m of climbing. The longest was ${longest.name}, ${format.distance(longest.distance)}.`;
-}
 
 function RaceTable({ races, units, slugs }: { races: Activity[]; units: UnitSystem; slugs: Record<string, string> }) {
   return (

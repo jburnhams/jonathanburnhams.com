@@ -12,7 +12,7 @@ import { PhotoBand, PlainBand } from '../components/PhotoBand';
 import { useActivities } from '../data/activities';
 import { Activity, type StravaActivityJSON, type UnitSystem } from '../models/Activity';
 import { useRacePages } from '../utils/racePages';
-import { TILES } from './Running';
+import { TILES } from '../data/races';
 
 declare global {
   // Embedded in each race's static page by scripts/build-race-pages.mjs

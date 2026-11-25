@@ -14,26 +14,10 @@ describe('hydrateBuildTimestampBadges', () => {
     badge.setAttribute('data-build-timestamp', '2024-06-15T12:30:45.000Z')
     document.body.appendChild(badge)
 
-    const formatMock = vi.fn().mockReturnValue('Formatted Date')
-    const formatterMock = { format: formatMock } as unknown as Intl.DateTimeFormat
-
-    const dateTimeFormatSpy = vi
-      .spyOn(Intl, 'DateTimeFormat')
-      .mockReturnValue(formatterMock)
-
     hydrateBuildTimestampBadges()
 
-    expect(dateTimeFormatSpy).toHaveBeenCalledWith('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
-    expect(formatMock).toHaveBeenCalledTimes(1)
-    expect(formatMock.mock.calls[0][0]).toEqual(new Date('2024-06-15T12:30:45.000Z'))
-    expect(badge.textContent).toBe('Formatted Date')
+    // en-GB day/month/year and a 24-hour time, in the visitor's own time zone
+    expect(badge.textContent).toMatch(/^15\/06\/2024, \d{2}:\d{2}$/)
   })
 
   it('falls back to the placeholder text when the timestamp is invalid', () => {

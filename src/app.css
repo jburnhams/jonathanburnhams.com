@@ -2,6 +2,7 @@
    photo (generated; see DESIGN.md), then the few things the site draws itself. */
 @import "tailwindcss";
 @import "strata-react/strata.css";
+@import "./theme.css";
 @import "./backgrounds/palettes.css";
 
 @theme inline {

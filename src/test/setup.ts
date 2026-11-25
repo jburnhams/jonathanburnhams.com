@@ -8,6 +8,6 @@ import { installLayoutShims } from 'strata-react/testing'
 import { server } from './server'
 
 installLayoutShims()
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 afterEach(() => { cleanup(); server.resetHandlers(); sessionStorage.clear(); delete document.body.dataset.photo })
 afterAll(() => server.close())

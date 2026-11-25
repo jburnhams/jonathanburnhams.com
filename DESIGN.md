@@ -43,11 +43,13 @@ per visit rather than one colour forever.
 Each background photo carries its own palette, made at build time by
 `scripts/backgrounds/backgrounds.mjs` and written to `src/backgrounds/palettes.css`:
 
-- **Seeds** come from the photo (k-means in OKLab on a 96 px copy): **primary** is the photo's
-  strongest colour that covers a real part of the frame (chroma weighted by share^0.3: a red
-  jacket beats a pale sky); **secondary** is the colour the photo is mostly made of (rock, grass,
-  snow), lifted to a usable chroma. A grey photo (nothing above C 0.05) takes the complement of
-  its main hue, so the page still has a colour.
+- **Seeds** come from the photo (k-means in OKLab on a 96 px copy of its **lower two thirds**:
+  the top third of nearly every race photo is sky, and taking colours from it made 15 of the first
+  18 palettes the same blue). **Primary** is the land's strongest colour that covers a real part of
+  the frame (chroma weighted by share^0.3: a red jacket beats a pale hillside); **secondary** is a
+  second colour the photo is made of (rock, grass, water), lifted to a usable chroma. A muted photo
+  (nothing above C 0.05) takes the complement of its main hue, or its own hue deepened where the
+  complement would be violet or indigo (the stock AI accent).
 - The seeds go through ux-research's `palette.mjs` (vendored in `scripts/backgrounds/`), which
   solves the 12-step ramps against WCAG contrast for light and dark and fails the build if a role
   pair falls short (it retries at contrast level 1 before failing).

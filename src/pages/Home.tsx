@@ -5,7 +5,7 @@
 // other text, and "Another photo" changes the photo and with it the colours.
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { backgrounds, rememberPhoto, shuffle, usePhotoPalette, type Background } from '../backgrounds';
+import { backgrounds, rememberPhoto, usePhotoPalette, visitOrder, type Background } from '../backgrounds';
 import { Backdrop } from '../components/home/Backdrop';
 import { PhotoCaption, placeClass } from '../components/home/PhotoCaption';
 import BuildTimestampBadge from '../components/BuildTimestampBadge/BuildTimestampBadge';
@@ -22,13 +22,6 @@ const PLACES: { label: string; to?: string; href?: string }[] = [
   { label: 'YouTube', href: 'https://www.youtube.com/@JonathanBurnhams' },
   { label: 'GitHub', href: 'https://github.com/jburnhams' },
 ];
-
-/** The visit's order: the photo the <head> script chose first, then the rest shuffled. */
-export function visitOrder(all: readonly Background[], first?: string, random?: () => number): Background[] {
-  const rest = shuffle(all.filter(b => b.id !== first), random);
-  const head = all.find(b => b.id === first);
-  return head ? [head, ...rest] : rest;
-}
 
 const Home = ({ order: given }: { order?: Background[] }) => {
   const order = useMemo(() => given ?? visitOrder(backgrounds, window.__FIRST_PHOTO__), [given]);

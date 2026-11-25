@@ -19,7 +19,7 @@ export function PhotoCaption({ photo, onNext, canChange = false, className }: { 
   const facts = [
     a.date ? format.date(a.date) : null,
     a.distance ? format.distance(a.distance) : null,
-    a.elevation ? `${format.integer(Math.round(a.elevation))} m climb` : null,
+    a.elevation ? `${format.integer(Math.round(a.elevation))}\u00a0m climb` : null,
   ].filter(Boolean);
   return (
     <figure className={cn('flex items-center gap-4 rounded-surface bg-ink p-4 text-ink-foreground', className)}>

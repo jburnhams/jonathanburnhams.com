@@ -84,3 +84,10 @@ export function sessionPhoto(): Background | undefined {
   try { id = sessionStorage.getItem(SESSION_KEY); } catch { /* storage blocked */ }
   return backgrounds.find(b => b.id === id) ?? backgrounds[0];
 }
+
+/** The visit's order: the photo the <head> script chose first, then the rest shuffled. */
+export function visitOrder(all: readonly Background[], first?: string, random?: () => number): Background[] {
+  const rest = shuffle(all.filter(b => b.id !== first), random);
+  const head = all.find(b => b.id === first);
+  return head ? [head, ...rest] : rest;
+}

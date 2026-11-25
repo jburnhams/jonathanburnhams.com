@@ -6,7 +6,7 @@ let cache: Promise<Record<string, string>> | null = null;
 
 export function getRacePages(): Promise<Record<string, string>> {
   cache ??= Promise.resolve()
-    .then(() => fetch('/race-pages.json'))
+    .then(() => fetch(new URL('/race-pages.json', window.location.href)))
     .then(res => (res?.ok ? res.json() : {}))
     .then(data => (data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, string>) : {}))
     .catch(() => ({}));

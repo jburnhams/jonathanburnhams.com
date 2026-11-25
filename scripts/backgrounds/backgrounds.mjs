@@ -165,7 +165,12 @@ async function review() {
 
 /** k-means in OKLab on the photo at 96 px: the photo's main colours and how much of it each covers. */
 export async function photoColours(input, k = 8) {
-  const raw = await sharp(input).rotate().resize({ width: 96 }).removeAlpha().raw().toBuffer();
+  // The land, not the sky: the top third of almost every race photo is sky, and taking colours from
+  // it made nearly every palette the same blue. The bottom two thirds hold the ground, the people
+  // and the gear, and it is where the panel sits, so the ink matches what is behind it.
+  const small = await sharp(input).rotate().resize({ width: 96 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const top = Math.round(small.info.height * 0.35) * small.info.width * 3;
+  const raw = small.data.subarray(top);
   const pts = [];
   for (let i = 0; i < raw.length; i += 3) pts.push(rgbToOklab([raw[i] / 255, raw[i + 1] / 255, raw[i + 2] / 255]));
   // deterministic k-means++ start (seeded from the pixels themselves)
@@ -189,7 +194,9 @@ export async function photoColours(input, k = 8) {
     }
   }
   const counts = centres.map((_, j) => assign.filter((a) => a === j).length);
-  const mean = [0, 1, 2].map((d) => pts.reduce((s, p) => s + p[d], 0) / pts.length);
+  const all = [];
+  for (let i = 0; i < small.data.length; i += 3) all.push(rgbToOklab([small.data[i] / 255, small.data[i + 1] / 255, small.data[i + 2] / 255]));
+  const mean = [0, 1, 2].map((d) => all.reduce((s, p) => s + p[d], 0) / all.length);
   return {
     clusters: centres.map((c, j) => ({ lch: oklabToOklch(c), share: counts[j] / pts.length }))
       .filter((c) => c.share > 0).sort((a, b) => b.share - a.share),
@@ -202,8 +209,9 @@ const hueGap = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
 /**
  * The two seeds for palette.mjs. Primary is the photo's own strongest colour (a jacket, a sky, a
  * race flag): the most chromatic colour that covers a real part of the frame. Secondary is the
- * colour the photo is mostly made of (rock, grass, snow), which tints the grounds. A grey photo
- * (nothing above C 0.05) takes the complement of its main hue, so the page still has a colour.
+ * colour the photo is mostly made of (rock, grass, snow). Both come from the land (photoColours skips
+ * the sky). A muted photo (nothing above C 0.05) takes the complement of its main hue, or its own hue
+ * where the complement is violet, so the page still has a colour.
  */
 export function seedsFrom({ clusters }) {
   const usable = clusters.filter((c) => c.share >= 0.02 && c.lch[0] > 0.3 && c.lch[0] < 0.9);
@@ -213,7 +221,10 @@ export function seedsFrom({ clusters }) {
   if (vivid && vivid.lch[1] >= 0.05) {
     primary = [Math.min(0.68, Math.max(0.45, vivid.lch[0])), Math.max(0.1, vivid.lch[1]), vivid.lch[2]];
   } else {
-    primary = [0.55, 0.13, (main.lch[2] + 180) % 360];
+    // A muted photo: its complement, unless that lands on violet/indigo (the stock AI accent,
+    // ux-research tells.md wave 1), in which case its own main hue, deepened.
+    const opposite = (main.lch[2] + 180) % 360;
+    primary = [0.55, 0.13, opposite >= 250 && opposite <= 320 ? main.lch[2] : opposite];
   }
   const second = clusters.find((c) => c.share >= 0.08 && hueGap(c.lch[2], primary[2]) >= 40 && c.lch[1] >= 0.02);
   const secondary = second
