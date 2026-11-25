@@ -4,7 +4,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "70% 40%",
   "activity": {
    "id": 3164050960,
    "name": "Trans Gran Canaria",
@@ -69,7 +69,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "70% 55%",
   "activity": {
    "id": 6946389949,
    "name": "Northern Traverse",
@@ -134,7 +134,7 @@
   "width": 1200,
   "height": 720,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "75% 35%",
   "activity": {
    "id": 19476529817,
    "name": "Beacons Way 100",
@@ -199,7 +199,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "50% 55%",
   "activity": {
    "id": 6946389949,
    "name": "Northern Traverse",
@@ -264,7 +264,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "55% 55%",
   "activity": {
    "id": 11987422020,
    "name": "Crossing Switzerland",
@@ -329,7 +329,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "75% 80%",
   "activity": {
    "id": 7230974312,
    "name": "Cape Wrath Ultra 2022",
@@ -394,7 +394,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "40% 60%",
   "activity": {
    "id": 7230974312,
    "name": "Cape Wrath Ultra 2022",
@@ -459,7 +459,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "50% 55%",
   "activity": {
    "id": 7230974312,
    "name": "Cape Wrath Ultra 2022",
@@ -524,7 +524,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "30% 55%",
   "activity": {
    "id": 7230974312,
    "name": "Cape Wrath Ultra 2022",
@@ -654,7 +654,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "50% 40%",
   "activity": {
    "id": 10593231920,
    "name": "Spine Race 2024",
@@ -719,7 +719,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "50% 55%",
   "activity": {
    "id": 9074213883,
    "name": "Ultra-Trail Snowdonia 100M",
@@ -784,7 +784,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "45% 55%",
   "activity": {
    "id": 13968465216,
    "name": "Norm's Helium Loops",
@@ -914,7 +914,7 @@
   "width": 1200,
   "height": 800,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "57% 40%",
   "activity": {
    "id": 7723983274,
    "name": "UTMB",
@@ -979,7 +979,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "50% 60%",
   "activity": {
    "id": 7560487585,
    "name": "Lakeland 100",
@@ -1044,7 +1044,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "45% 45%",
   "activity": {
    "id": 3164050960,
    "name": "Trans Gran Canaria",
@@ -1109,7 +1109,7 @@
   "width": 1200,
   "height": 900,
   "source": "strava-sync",
-  "focus": "50% 50%",
+  "focus": "75% 55%",
   "activity": {
    "id": 5686686878,
    "name": "Lakeland 50",
