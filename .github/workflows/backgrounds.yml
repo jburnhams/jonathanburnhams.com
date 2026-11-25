@@ -1,0 +1,48 @@
+# Builds the background photos where strava-sync can be reached, and commits the result to the branch.
+# scripts/backgrounds/backgrounds.mjs says what it makes. Runs when the selection or the script
+# changes, or by hand. With no .photo-review/ on the branch it first writes the contact sheets to
+# choose from; with backgrounds/selection.json it builds those photos (from strava-sync's ~1200 px
+# copies; full-size builds come from a Strava export, run locally with --originals).
+name: Background photos
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - backgrounds/selection.json
+      - scripts/backgrounds/**
+      - .github/workflows/backgrounds.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backgrounds-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  photos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Contact sheets
+        if: hashFiles('.photo-review/candidates.json') == ''
+        run: node scripts/backgrounds/backgrounds.mjs review
+      - name: Build the chosen photos
+        if: hashFiles('backgrounds/selection.json') != ''
+        run: node scripts/backgrounds/backgrounds.mjs build
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A .photo-review public/backgrounds src/backgrounds 2>/dev/null || true
+          if git diff --cached --quiet; then echo "nothing changed"; exit 0; fi
+          git commit -m "Background photos: built by the Background photos workflow"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

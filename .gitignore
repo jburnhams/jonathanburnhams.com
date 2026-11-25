@@ -26,3 +26,6 @@ dist-ssr
 
 # Test coverage
 coverage
+
+# Photo downloads for scripts/backgrounds (the outputs are committed)
+.cache
