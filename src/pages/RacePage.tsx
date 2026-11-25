@@ -3,7 +3,7 @@
 // race's data embedded in the page, or the activities API in dev. When one of the race's photos is
 // in the background set it heads the page and colours it; otherwise the page keeps the visit's
 // colours and starts with the name.
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useParams } from 'react-router';
 import { DataView, EmptyState, Lightbox, Metric, MetricStrip, Skeleton, TextLink, ToggleGroup, Thumbnail, format, useLightboxUrl, useSearchParam } from 'strata-react';
 import { RouteMap } from 'strata-react/map';
@@ -83,9 +83,11 @@ const RacePage = () => {
   const own = backgroundFor(activity?.id);
   const photo = own ?? sessionPhoto();
   usePhotoPalette(photo);
+  useEffect(() => {
+    if (activity) document.title = `${activity.name} (${activity.startDate.getFullYear()}) | Jonathan Burnhams`;
+  }, [activity]);
 
   if (activity) {
-    document.title = `${activity.name} (${activity.startDate.getFullYear()}) | Jonathan Burnhams`;
     return (
       <>
         {own ? <PhotoBand photo={own} title={activity.name} named={false} /> : <PlainBand title={activity.name} />}

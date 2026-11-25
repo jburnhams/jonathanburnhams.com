@@ -141,6 +141,8 @@ const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: s
     }
   }, [listParams, fail]);
 
+  // A fetch on filter change is what this effect is for; the loading flag it sets is part of that
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchPage(0); }, [fetchPage]);
 
   const yearlyTotals = useMemo(() => totalsByPeriod(yearly ?? []), [yearly]);
