@@ -1,13 +1,30 @@
-import { defineConfig } from 'vite'
+/// <reference types="vitest/config" />
+import { readFileSync } from 'node:fs'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import { firstPhotoScript } from './scripts/backgrounds/first-photo.mjs'
 
-// https://vitejs.dev/config/
+// Puts the homepage's first-photo script (scripts/backgrounds/first-photo.mjs) in <head>
+function firstPhoto(): Plugin {
+  return {
+    name: 'first-photo',
+    transformIndexHtml(html) {
+      const manifest = JSON.parse(readFileSync(new URL('./src/backgrounds/backgrounds.json', import.meta.url), 'utf8'))
+      const script = firstPhotoScript(manifest)
+      return script ? html.replace('<!-- first-photo -->', `<script>${script}</script>`) : html
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss(), firstPhoto()],
   test: {
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
-    css: true,
+    css: false,
+    // strata-react/map imports Leaflet's stylesheet; inlined, Vite handles the CSS import
+    server: { deps: { inline: ['strata-react'] } },
   },
 })

@@ -1,0 +1,94 @@
+// The background photos and their colour schemes, built by scripts/backgrounds/backgrounds.mjs
+// (see DESIGN.md). backgrounds.json and palettes.css are generated; this is the code that uses them.
+import { useEffect } from 'react';
+import manifest from './backgrounds.json';
+
+export interface Background {
+  id: string;
+  width: number;
+  height: number;
+  source: 'strava-sync' | 'export' | 'original';
+  /** object-position, so the subject survives the crop */
+  focus: string;
+  caption?: string;
+  activity: {
+    id: number;
+    name: string | null;
+    date: string | null;
+    type?: string | null;
+    distance?: number | null; // metres
+    elevation?: number | null; // metres
+    /** the route in a 100 x 100 box, as SVG path data */
+    route?: string | null;
+  };
+  /** bytes per format; WebP, the fallback, stops at about 1920 px */
+  sizes: { width: number; avif: number; webp?: number }[];
+  placeholder: string;
+  colours: { mean: string; ink: string; inkText: string; primary: string; secondary: string };
+}
+
+export const backgrounds = manifest as unknown as Background[];
+
+/** `srcset` for one format: every width built in it. */
+export function srcSet(b: Background, format: 'avif' | 'webp'): string {
+  return b.sizes.filter(s => s[format]).map(s => `/backgrounds/${b.id}-${s.width}.${format} ${s.width}w`).join(', ');
+}
+
+/** The largest WebP, for a plain `src` and for Open Graph. */
+export function largest(b: Background): string {
+  return `/backgrounds/${b.id}-${b.sizes.filter(s => s.webp).at(-1)?.width}.webp`;
+}
+
+/** A background from the given race, if one of its photos is in the set. */
+export function backgroundFor(activityId: number | undefined): Background | undefined {
+  return activityId === undefined ? undefined : backgrounds.find(b => b.activity.id === activityId);
+}
+
+/**
+ * The order the homepage shows them in: a fresh shuffle per visit, so a returning visitor sees a
+ * different race first. `random` is for tests.
+ */
+export function shuffle<T>(items: readonly T[], random: () => number = Math.random): T[] {
+  const out = items.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * Puts the photo's palette on the page: `data-photo` on <body> selects its block in palettes.css
+ * (on body, not a wrapper, so dialogs and popovers portalled to body take it too). Removed when
+ * the page that set it goes, so a page without a photo is back on strata's default look.
+ */
+export function usePhotoPalette(b: Background | undefined) {
+  useEffect(() => {
+    if (!b) return;
+    document.body.dataset.photo = b.id;
+    return () => {
+      if (document.body.dataset.photo === b.id) delete document.body.dataset.photo;
+    };
+  }, [b]);
+}
+
+const SESSION_KEY = 'photo';
+
+/** Remembers the photo the visitor last saw, so the next page keeps its colours (sessionStorage; carries on without it). */
+export function rememberPhoto(b: Background | undefined) {
+  try { if (b) sessionStorage.setItem(SESSION_KEY, b.id); } catch { /* storage blocked */ }
+}
+
+/** The photo for a page with no race of its own: the one last seen this visit, else the first in the set. */
+export function sessionPhoto(): Background | undefined {
+  let id: string | null = null;
+  try { id = sessionStorage.getItem(SESSION_KEY); } catch { /* storage blocked */ }
+  return backgrounds.find(b => b.id === id) ?? backgrounds[0];
+}
+
+/** The visit's order: the photo the <head> script chose first, then the rest shuffled. */
+export function visitOrder(all: readonly Background[], first?: string, random?: () => number): Background[] {
+  const rest = shuffle(all.filter(b => b.id !== first), random);
+  const head = all.find(b => b.id === first);
+  return head ? [head, ...rest] : rest;
+}

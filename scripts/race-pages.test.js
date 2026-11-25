@@ -78,9 +78,9 @@ describe('race pages', () => {
 
   it('puts plain links to /running/ and /training in the homepage HTML, matching the Hero markup', () => {
     const html = homePage(TEMPLATE);
-    expect(html).toContain('<a href="/running/" class="hero-link">');
-    expect(html).toContain('<a href="/training/" class="hero-link">');
-    expect(html).toContain('<span class="hero-name">Jonathan Burnhams</span>');
+    expect(html).toContain('<a href="/running/" class="type-heading">Running</a>');
+    expect(html).toContain('<a href="/training/" class="type-heading">Training</a>');
+    expect(html).toContain('<h1 class="type-name text-balance">Jonathan Burnhams</h1>');
     expect(html).toContain('<title>Jonathan Burnhams</title>'); // head unchanged
     expect(html.match(/id="root"/g)).toHaveLength(1);
   });

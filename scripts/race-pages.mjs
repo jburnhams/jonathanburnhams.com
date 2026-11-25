@@ -163,18 +163,19 @@ export function sitemap(races, slugs) {
     .join('\n')}\n</urlset>\n`;
 }
 
-// The homepage's static HTML: the hero with plain links (same markup and classes as the Hero
-// component, so it looks the same before the app takes over), so crawlers can follow them
+// The homepage's static HTML: his name and the plain links, in the same markup and classes as
+// src/pages/Home.tsx, so the page reads the same before the app (and the photo) arrive.
 export function homePage(template) {
   const links = [
-    ['/running/', '🏃‍♂️ Running 🏃‍♀️'],
-    ['/training/', '📈 Training'],
-    ['https://www.strava.com/athletes/jburnhams', '🔗 Strava Profile'],
-    ['https://www.youtube.com/@JonathanBurnhams', '📹 YouTube 🎬'],
-    ['https://github.com/jburnhams', '👨‍💻 GitHub 💻'],
-  ].map(([href, text]) => `<a href="${href}" class="hero-link">${text}</a>`).join('');
-  const body = `<section class="hero" role="banner"><div class="hero-content"><h1 class="hero-title"><span class="hero-name">Jonathan Burnhams</span></h1>`
-    + `<div class="hero-underline" aria-hidden="true"></div><div class="hero-links">${links}</div></div></section>`;
+    ['/running/', 'Running'],
+    ['/training/', 'Training'],
+    ['https://www.strava.com/athletes/jburnhams', 'Strava'],
+    ['https://www.youtube.com/@JonathanBurnhams', 'YouTube'],
+    ['https://github.com/jburnhams', 'GitHub'],
+  ].map(([href, text]) => `<li><a href="${href}" class="type-heading">${text}</a></li>`).join('');
+  const body = `<div class="dark"><main class="flex min-h-dvh flex-col justify-end gap-5 bg-ink p-4 text-ink-foreground md:p-8">`
+    + `<h1 class="type-name text-balance">Jonathan Burnhams</h1>`
+    + `<nav aria-label="Elsewhere"><ul class="flex flex-wrap gap-x-6 gap-y-2">${links}</ul></nav></main></div>`;
   return template.replace('<div id="root"></div>', `<div id="root">${body}</div>`);
 }
 

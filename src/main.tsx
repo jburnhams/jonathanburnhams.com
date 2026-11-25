@@ -1,13 +1,21 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
-import './index.css'
-import { hydrateBuildTimestampBadges } from './utils/hydrateBuildTimestampBadges.ts'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { createBrowserRouter, RouterProvider } from 'react-router'
+import { StrataQueryProvider, ThemeProvider } from 'strata-react'
+import { routes } from './routes'
+import './app.css'
+import { hydrateBuildTimestampBadges } from './utils/hydrateBuildTimestampBadges'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+const router = createBrowserRouter(routes)
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ThemeProvider>
+      <StrataQueryProvider>
+        <RouterProvider router={router} />
+      </StrataQueryProvider>
+    </ThemeProvider>
+  </StrictMode>,
 )
 
 hydrateBuildTimestampBadges()

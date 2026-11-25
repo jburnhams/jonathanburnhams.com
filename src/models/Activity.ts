@@ -178,9 +178,9 @@ export class Activity {
   getFormattedElevation(system: UnitSystem = 'metric'): string {
     if (system === 'imperial') {
       const feet = this.elevationGain * 3.28084;
-      return Math.round(feet) + ' ft';
+      return Math.round(feet).toLocaleString('en-GB') + ' ft';
     }
-    return Math.round(this.elevationGain) + ' m';
+    return Math.round(this.elevationGain).toLocaleString('en-GB') + ' m';
   }
 
   get formattedDate(): string {

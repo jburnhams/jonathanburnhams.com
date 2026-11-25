@@ -1,0 +1,477 @@
+#!/usr/bin/env node
+// Full-screen background photos from Jonathan's Strava, made small enough to load fast.
+//
+//   node scripts/backgrounds/backgrounds.mjs review
+//     Fetches every photo strava-sync serves (the ~1200 px copies), scores each for use as a
+//     full-screen background (shape, sharpness, exposure, colour) and writes a numbered contact
+//     sheet of the best to .photo-review/, to choose from by eye.
+//
+//   node scripts/backgrounds/backgrounds.mjs build [--photos <dir>] [--originals <Strava export dir>]
+//     For each photo in backgrounds/selection.json: AVIF and WebP at several widths (none wider
+//     than the source), a tiny blurred placeholder, and a colour scheme taken from the photo
+//     (ux-research palette.mjs, contrast-checked). Writes public/backgrounds/*.{avif,webp},
+//     src/backgrounds/backgrounds.json and src/backgrounds/palettes.css.
+//     Each photo is encoded from the best source given: --photos, a folder of camera originals named
+//     <id>.<ext>; else --originals, a Strava bulk export (activities.csv's Media column, the same ids
+//     strava-sync uses: <activity id>_<position>; Strava keeps 2048 px); else the strava-sync copy,
+//     which stops at ~1200 px. A photo already built from a better source than this run has is kept.
+//     The colours always come from the strava-sync copy, so they do not move with the source.
+//
+// Why these choices: AVIF is about half the bytes of WebP at the same look and every current
+// browser decodes it; WebP is the fallback for the rest, so it stops at 1920. Widths step by about
+// 1.5x so a screen downloads at most ~1.5x the pixels it shows. The largest are shown on dense or
+// very large screens, where compression is harder to see, so they get a lower quality. The placeholder is the photo at 32 px, inlined in
+// the manifest, so the page shows the photo's colours on the first frame.
+
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { basename, dirname, extname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import sharp from "sharp";
+import { contrast, hexToOklch, oklabToOklch, oklchToHex, rgbToOklab, solveLightness } from "./color.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(HERE, "../..");
+const API = "https://stravasync.jonathanburnhams.com";
+const CACHE = join(ROOT, ".cache/backgrounds");
+const REVIEW = join(ROOT, ".photo-review");
+const SELECTION = join(ROOT, "backgrounds/selection.json");
+const OUT_IMG = join(ROOT, "public/backgrounds");
+const OUT_SRC = join(ROOT, "src/backgrounds");
+
+export const WIDTHS = [640, 960, 1440, 1920, 2560, 3200];
+const WEBP_MAX = 1920;
+export const avifQuality = (width) => (width <= 1440 ? 52 : width <= 1920 ? 50 : width <= 2560 ? 46 : 42);
+const avifOptions = (width) => ({ quality: avifQuality(width), effort: 6, chromaSubsampling: "4:2:0" });
+const WEBP = { quality: 74, effort: 6, smartSubsample: true };
+const IMAGES = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".tif", ".tiff"];
+
+/** The widths to build for a source this wide: the steps clearly below it, then the source itself (capped). */
+export function widthsFor(sourceWidth) {
+  const top = Math.min(sourceWidth, WIDTHS[WIDTHS.length - 1]);
+  return [...WIDTHS.filter((x) => x < top * 0.9), top];
+}
+
+/** The widths that also get a WebP: up to WEBP_MAX, or the smallest one above it when nothing reaches it. */
+export function webpWidths(widths) {
+  const small = widths.filter((x) => x <= WEBP_MAX);
+  const next = widths.find((x) => x > WEBP_MAX);
+  return next && small[small.length - 1] < WEBP_MAX * 0.9 ? [...small, next] : small;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fetching
+// ---------------------------------------------------------------------------------------------
+
+async function getJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url}: ${res.status}`);
+  return { data: await res.json(), headers: res.headers };
+}
+
+/** Every photo strava-sync has, once each (one pass of a fixed shuffle, paged 100 at a time). */
+export async function listPhotos() {
+  const all = [];
+  for (let offset = 0, total = Infinity; offset < total; offset += 100) {
+    const { data, headers } = await getJson(`${API}/api/photos/random?seed=backgrounds&offset=${offset}&limit=100`);
+    total = Number(headers.get("x-total-count") ?? data.length);
+    all.push(...data.slice(0, Math.max(0, total - offset)));
+  }
+  return all;
+}
+
+async function cached(id, url) {
+  mkdirSync(CACHE, { recursive: true });
+  const file = join(CACHE, `${id}.jpg`);
+  if (!existsSync(file)) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${url}: ${res.status}`);
+    writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+  }
+  return readFileSync(file);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Scoring: is it a good full-screen background?
+// ---------------------------------------------------------------------------------------------
+
+/** Sharpness (variance of the Laplacian at 512 px), exposure and colourfulness of one image. */
+export async function analyse(input) {
+  const img = sharp(input).rotate();
+  const { width, height } = await img.metadata().then((m) => (m.orientation >= 5 ? { width: m.height, height: m.width } : m));
+  const W = 512;
+  const g = await sharp(input).rotate().resize({ width: W }).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const { data: px, info } = g;
+  let sum = 0, sum2 = 0, n = 0, dark = 0, bright = 0, luma = 0;
+  for (let y = 1; y < info.height - 1; y++) for (let x = 1; x < info.width - 1; x++) {
+    const i = y * info.width + x;
+    const lap = 4 * px[i] - px[i - 1] - px[i + 1] - px[i - info.width] - px[i + info.width];
+    sum += lap; sum2 += lap * lap; n++;
+  }
+  for (const v of px) { luma += v; if (v < 10) dark++; if (v > 245) bright++; }
+  const sharpness = sum2 / n - (sum / n) ** 2;
+  const c = await sharp(input).rotate().resize({ width: 128 }).removeAlpha().raw().toBuffer();
+  let rgS = 0, rgS2 = 0, ybS = 0, ybS2 = 0, m = 0;
+  for (let i = 0; i < c.length; i += 3) {
+    const rg = c[i] - c[i + 1], yb = (c[i] + c[i + 1]) / 2 - c[i + 2];
+    rgS += rg; rgS2 += rg * rg; ybS += yb; ybS2 += yb * yb; m++;
+  }
+  const sd = (s, s2) => Math.sqrt(Math.max(0, s2 / m - (s / m) ** 2));
+  // Hasler & Süsstrunk 2003
+  const colourfulness = Math.hypot(sd(rgS, rgS2), sd(ybS, ybS2)) + 0.3 * Math.hypot(rgS / m, ybS / m);
+  return {
+    width, height,
+    sharpness: Math.round(sharpness),
+    luma: +(luma / px.length / 255).toFixed(3),
+    clipped: +((dark + bright) / px.length).toFixed(3),
+    colourfulness: +colourfulness.toFixed(1),
+  };
+}
+
+/** One number to sort by. Landscape, sharp, well exposed and colourful scores high. */
+export function score(a) {
+  const ratio = a.width / a.height;
+  const shape = ratio >= 1.3 ? 1 : ratio >= 1.0 ? 0.6 : 0.25; // a desktop screen is landscape
+  const sharp = Math.min(1, Math.log10(Math.max(1, a.sharpness)) / 3.2);
+  const exposure = 1 - Math.min(1, Math.abs(a.luma - 0.45) / 0.45) * 0.7 - Math.min(0.5, a.clipped * 2);
+  const colour = Math.min(1, a.colourfulness / 60);
+  const size = Math.min(1, Math.max(a.width, a.height) / 1200);
+  return +(shape * (0.4 * sharp + 0.3 * exposure + 0.3 * colour) * size).toFixed(3);
+}
+
+async function review() {
+  const photos = await listPhotos();
+  console.log(`${photos.length} photos`);
+  const rows = [];
+  for (const p of photos) {
+    try {
+      const buf = await cached(p.id, p.url);
+      const a = await analyse(buf);
+      rows.push({ id: p.id, activity: p.activity, caption: p.caption, ...a, score: score(a) });
+    } catch (e) {
+      console.warn(`skip ${p.id}: ${e.message}`);
+    }
+  }
+  rows.sort((a, b) => b.score - a.score);
+  rmSync(REVIEW, { recursive: true, force: true });
+  mkdirSync(REVIEW, { recursive: true });
+  rows.forEach((r, i) => (r.n = i + 1));
+  writeFileSync(join(REVIEW, "candidates.json"), JSON.stringify(rows, null, 1) + "\n");
+  // Contact sheets: 48 per sheet, 6 across, numbered in score order
+  const PER = 48, COLS = 6, TW = 420, TH = 280, LABEL = 26;
+  const top = rows.filter((r) => r.width / r.height >= 1.2).slice(0, 144);
+  for (let s = 0; s * PER < top.length; s++) {
+    const page = top.slice(s * PER, (s + 1) * PER);
+    const rowsN = Math.ceil(page.length / COLS);
+    const tiles = await Promise.all(page.map(async (r, i) => {
+      const img = await sharp(readFileSync(join(CACHE, `${r.id}.jpg`))).rotate().resize(TW, TH, { fit: "cover" }).jpeg().toBuffer();
+      const label = Buffer.from(`<svg width="${TW}" height="${LABEL}"><rect width="100%" height="100%" fill="#000"/><text x="6" y="19" font-family="DejaVu Sans, sans-serif" font-size="16" fill="#fff">${r.n}  ${r.id}  ${(r.activity?.name ?? "").replace(/[<&>]/g, "").slice(0, 32)}</text></svg>`);
+      return [
+        { input: img, left: (i % COLS) * TW, top: Math.floor(i / COLS) * (TH + LABEL) },
+        { input: label, left: (i % COLS) * TW, top: Math.floor(i / COLS) * (TH + LABEL) + TH },
+      ];
+    }));
+    await sharp({ create: { width: COLS * TW, height: rowsN * (TH + LABEL), channels: 3, background: "#222" } })
+      .composite(tiles.flat()).jpeg({ quality: 70 }).toFile(join(REVIEW, `sheet-${s + 1}.jpg`));
+  }
+  console.log(`wrote ${REVIEW}`);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Colour: a scheme for the page from the photo
+// ---------------------------------------------------------------------------------------------
+
+/** k-means in OKLab on the photo at 96 px: the photo's main colours and how much of it each covers. */
+export async function photoColours(input, k = 8) {
+  // The land, not the sky: the top third of almost every race photo is sky, and taking colours from
+  // it made nearly every palette the same blue. The bottom two thirds hold the ground, the people
+  // and the gear, and it is where the panel sits, so the ink matches what is behind it.
+  const small = await sharp(input).rotate().resize({ width: 96 }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const top = Math.round(small.info.height * 0.35) * small.info.width * 3;
+  const raw = small.data.subarray(top);
+  const pts = [];
+  for (let i = 0; i < raw.length; i += 3) pts.push(rgbToOklab([raw[i] / 255, raw[i + 1] / 255, raw[i + 2] / 255]));
+  // deterministic k-means++ start (seeded from the pixels themselves)
+  let seed = 7;
+  const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+  const centres = [pts[Math.floor(rand() * pts.length)]];
+  while (centres.length < k) {
+    const ds = pts.map((p) => Math.min(...centres.map((c) => d2(p, c))));
+    let r = rand() * ds.reduce((s, d) => s + d, 0);
+    let i = 0;
+    for (; i < ds.length - 1 && r > ds[i]; i++) r -= ds[i];
+    centres.push(pts[i]);
+  }
+  let assign = new Array(pts.length).fill(0);
+  for (let it = 0; it < 16; it++) {
+    assign = pts.map((p) => centres.reduce((best, c, j) => (d2(p, c) < d2(p, centres[best]) ? j : best), 0));
+    for (let j = 0; j < k; j++) {
+      const mine = pts.filter((_, i) => assign[i] === j);
+      if (mine.length) centres[j] = [0, 1, 2].map((d) => mine.reduce((s, p) => s + p[d], 0) / mine.length);
+    }
+  }
+  const counts = centres.map((_, j) => assign.filter((a) => a === j).length);
+  const all = [];
+  for (let i = 0; i < small.data.length; i += 3) all.push(rgbToOklab([small.data[i] / 255, small.data[i + 1] / 255, small.data[i + 2] / 255]));
+  const mean = [0, 1, 2].map((d) => all.reduce((s, p) => s + p[d], 0) / all.length);
+  return {
+    clusters: centres.map((c, j) => ({ lch: oklabToOklch(c), share: counts[j] / pts.length }))
+      .filter((c) => c.share > 0).sort((a, b) => b.share - a.share),
+    mean: oklabToOklch(mean),
+  };
+}
+
+const hueGap = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
+
+/**
+ * The two seeds for palette.mjs. Primary is the photo's own strongest colour (a jacket, a sky, a
+ * race flag): the most chromatic colour that covers a real part of the frame. Secondary is the
+ * colour the photo is mostly made of (rock, grass, snow). Both come from the land (photoColours skips
+ * the sky). A muted photo (nothing above C 0.05) takes the complement of its main hue, or its own hue
+ * where the complement is violet, so the page still has a colour.
+ */
+export function seedsFrom({ clusters }) {
+  const usable = clusters.filter((c) => c.share >= 0.02 && c.lch[0] > 0.3 && c.lch[0] < 0.9);
+  const vivid = usable.slice().sort((a, b) => b.lch[1] * b.share ** 0.3 - a.lch[1] * a.share ** 0.3)[0];
+  const main = clusters[0];
+  let primary;
+  if (vivid && vivid.lch[1] >= 0.05) {
+    primary = [Math.min(0.68, Math.max(0.45, vivid.lch[0])), Math.max(0.1, vivid.lch[1]), vivid.lch[2]];
+  } else {
+    // A muted photo: its complement, unless that lands on violet/indigo (the stock AI accent,
+    // ux-research tells.md wave 1), in which case its own main hue, deepened.
+    const opposite = (main.lch[2] + 180) % 360;
+    primary = [0.55, 0.13, opposite >= 250 && opposite <= 320 ? main.lch[2] : opposite];
+  }
+  const second = clusters.find((c) => c.share >= 0.08 && hueGap(c.lch[2], primary[2]) >= 40 && c.lch[1] >= 0.02);
+  const secondary = second
+    ? [0.72, Math.max(0.09, Math.min(0.15, second.lch[1] * 1.5)), second.lch[2]]
+    : [0.72, 0.12, (primary[2] + 150) % 360];
+  return { primary: oklchToHex(primary), secondary: oklchToHex(secondary), from: vivid && vivid.lch[1] >= 0.05 ? "photo" : "complement" };
+}
+
+/** palette.mjs (vendored from ux-research), its JSON: light and dark roles and ramps, plus its checks. */
+function palette(primary, secondary) {
+  const json = join(CACHE, `palette-${createHash("sha1").update(primary + secondary).digest("hex").slice(0, 10)}.json`);
+  mkdirSync(CACHE, { recursive: true });
+  for (const level of ["0.5", "1"]) {
+    try {
+      execFileSync(process.execPath, [join(HERE, "palette.mjs"), "--primary", primary, "--secondary", secondary, "--contrast", level, "--json", json, "--out", "/dev/null"], { stdio: ["ignore", "ignore", "pipe"] });
+      return { ...JSON.parse(readFileSync(json, "utf8")), level };
+    } catch (e) {
+      if (level === "1") throw new Error(`palette for ${primary}/${secondary} fails its checks:\n${e.stderr}`);
+    }
+  }
+}
+
+const oklchCss = (hex) => {
+  const [L, C, h] = hexToOklch(hex);
+  return `oklch(${(L * 100).toFixed(1)}% ${C.toFixed(3)} ${h.toFixed(1)})`;
+};
+
+// ---------------------------------------------------------------------------------------------
+// Build
+// ---------------------------------------------------------------------------------------------
+
+function parseCsv(text) {
+  const rows = []; let row = []; let field = ""; let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; } else if (c === '"') quoted = false; else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(field); rows.push(row); row = []; field = ""; }
+    else field += c;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((f) => f !== ""));
+}
+
+/** id (<activity id>_<position>) -> original file, from a Strava bulk export (as strava-sync numbers them). */
+export function exportFiles(dir) {
+  const [header, ...rows] = parseCsv(readFileSync(join(dir, "activities.csv"), "utf8"));
+  const idCol = header.indexOf("Activity ID"), mediaCol = header.lastIndexOf("Media");
+  const files = new Map();
+  for (const row of rows) {
+    const media = (row[mediaCol] ?? "").split("|").map((f) => f.trim())
+      .filter((f) => IMAGES.includes(extname(f).toLowerCase()));
+    media.forEach((f, pos) => files.set(`${row[idCol]}_${pos}`, join(dir, f)));
+  }
+  return files;
+}
+
+/** id -> camera original, from a folder of files named <id>.<ext>. */
+export function photoFiles(dir) {
+  return new Map(readdirSync(dir).filter((f) => IMAGES.includes(extname(f).toLowerCase()))
+    .map((f) => [basename(f, extname(f)), join(dir, f)]));
+}
+
+/** Google's encoded polyline (Strava's summary_polyline) -> [lat, lng][]. */
+export function decodePolyline(str) {
+  const out = [];
+  let i = 0, lat = 0, lng = 0;
+  while (i < str.length) {
+    for (const which of [0, 1]) {
+      let shift = 0, result = 0, b;
+      do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      const d = result & 1 ? ~(result >> 1) : result >> 1;
+      if (which === 0) lat += d; else lng += d;
+    }
+    out.push([lat / 1e5, lng / 1e5]);
+  }
+  return out;
+}
+
+/**
+ * The route as an SVG path in a 100 x 100 box (equirectangular, north up, aspect kept, centred),
+ * thinned to about 120 points: enough for its shape at caption size, a few hundred bytes.
+ */
+export function routePath(points, box = 100, max = 120) {
+  if (points.length < 2) return null;
+  const midLat = points.reduce((s, p) => s + p[0], 0) / points.length;
+  const k = Math.cos((midLat * Math.PI) / 180);
+  const xy = points.map(([la, ln]) => [ln * k, -la]);
+  const xs = xy.map((p) => p[0]), ys = xy.map((p) => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const span = Math.max(x1 - x0, y1 - y0) || 1;
+  const step = Math.max(1, Math.ceil(xy.length / max));
+  const thin = xy.filter((_, i) => i % step === 0 || i === xy.length - 1);
+  const ox = (box - ((x1 - x0) / span) * box) / 2, oy = (box - ((y1 - y0) / span) * box) / 2;
+  return thin.map(([x, y], i) => `${i ? "L" : "M"}${(ox + ((x - x0) / span) * box).toFixed(1)} ${(oy + ((y - y0) / span) * box).toFixed(1)}`).join("");
+}
+
+async function raceFacts() {
+  try {
+    const { data } = await getJson(`${API}/api/users/7828229/activities`);
+    return new Map(data.map((a) => {
+      const d = a.data_json ?? {};
+      const line = d.map?.summary_polyline;
+      return [Number(d.id ?? a.id), {
+        type: d.type ?? a.type ?? null,
+        distance: d.distance ?? a.distance ?? null,
+        elevation: d.total_elevation_gain ?? a.total_elevation_gain ?? null,
+        route: line ? routePath(decodePolyline(line)) : null,
+      }];
+    }));
+  } catch (e) {
+    console.warn(`activities: ${e.message}; captions get no route`);
+    return new Map();
+  }
+}
+
+const RANK = { "strava-sync": 0, export: 1, original: 2 };
+
+/** The files for one photo, written to public/backgrounds: its size, the widths built and the placeholder. */
+async function encode(id, input, source) {
+  const m = await sharp(input).metadata();
+  const [width, height] = m.orientation >= 5 ? [m.height, m.width] : [m.width, m.height];
+  const widths = widthsFor(width);
+  const webps = webpWidths(widths);
+  for (const old of readdirSync(OUT_IMG).filter((f) => f.startsWith(`${id}-`))) rmSync(join(OUT_IMG, old));
+  // sharp converts to sRGB and drops all metadata (EXIF, GPS) unless asked to keep it
+  const sizes = await Promise.all(widths.map(async (w) => {
+    const r = sharp(input).rotate().resize({ width: w });
+    const [avif, webp] = await Promise.all([r.clone().avif(avifOptions(w)).toBuffer(), webps.includes(w) ? r.clone().webp(WEBP).toBuffer() : null]);
+    writeFileSync(join(OUT_IMG, `${id}-${w}.avif`), avif);
+    if (webp) writeFileSync(join(OUT_IMG, `${id}-${w}.webp`), webp);
+    return { width: w, avif: avif.length, ...(webp ? { webp: webp.length } : {}) };
+  }));
+  const placeholder = await sharp(input).rotate().resize({ width: 32 }).webp({ quality: 50 }).toBuffer();
+  console.log(`${id}: ${width}x${height} from ${source}, ${sizes.map((f) => `${f.width}w ${Math.round(f.avif / 1024)}k${f.webp ? `/${Math.round(f.webp / 1024)}k` : ""}`).join(", ")}`);
+  return { width, height, source, sizes, placeholder: `data:image/webp;base64,${placeholder.toString("base64")}` };
+}
+
+async function build({ photos, originals }) {
+  const selection = JSON.parse(readFileSync(SELECTION, "utf8"));
+  const sources = [["original", photos ? photoFiles(photos) : new Map()], ["export", originals ? exportFiles(originals) : new Map()]];
+  const known = new Map((await listPhotos()).map((p) => [p.id, p]));
+  const races = await raceFacts();
+  mkdirSync(OUT_IMG, { recursive: true });
+  mkdirSync(OUT_SRC, { recursive: true });
+  const previous = existsSync(join(OUT_SRC, "backgrounds.json")) ? JSON.parse(readFileSync(join(OUT_SRC, "backgrounds.json"), "utf8")) : [];
+  for (const pick of selection) if (!known.has(pick.id)) throw new Error(`${pick.id} is not a photo strava-sync knows`);
+  // All at once: the encoding is the slow part, and libuv's pool (UV_THREADPOOL_SIZE) sets how many run
+  const images = new Map(await Promise.all(selection.map(async (pick) => {
+    const [source, files] = sources.find(([, f]) => f.has(pick.id) && existsSync(f.get(pick.id))) ?? ["strava-sync"];
+    // Keep a build from a better source (the workflow has no originals) rather than replace it with a small copy
+    const before = previous.find((p) => p.id === pick.id);
+    if (before && RANK[before.source] > RANK[source]) {
+      const { width, height, sizes, placeholder } = before;
+      return [pick.id, { width, height, source: before.source, sizes, placeholder }];
+    }
+    const input = files ? readFileSync(files.get(pick.id)) : await cached(pick.id, known.get(pick.id).url);
+    return [pick.id, await encode(pick.id, input, source)];
+  })));
+  const manifest = [];
+  const css = [];
+  for (const pick of selection) {
+    const meta = known.get(pick.id);
+    const { width, height, source, sizes, placeholder } = images.get(pick.id);
+    const input = await cached(pick.id, meta.url);
+    const colours = await photoColours(input);
+    const seeds = pick.primary ? { primary: pick.primary, secondary: pick.secondary ?? seedsFrom(colours).secondary, from: "chosen" } : seedsFrom(colours);
+    const pal = palette(seeds.primary, seeds.secondary);
+    // The panel the words sit on over the photo: the photo's main colour, taken down to a deep tone
+    const main = colours.clusters[0].lch;
+    const ink = oklchToHex([0.2, Math.min(0.045, main[1]), main[2]]);
+    const meanHex = oklchToHex(colours.mean);
+    // On the ink: text near white in the ink's hue (>= 12:1), a quieter line (>= 7:1), and the
+    // photo's own colour lifted until it reads as a line and a link on the ink (>= 4.5:1).
+    const onInk = (C, h, target) => oklchToHex([solveLightness({ C, h, against: ink, target, direction: "lighter" }) ?? 0.95, C, h]);
+    const [, pC, pH] = hexToOklch(seeds.primary);
+    const inkVars = {
+      "photo-ink": ink,
+      "photo-ink-foreground": onInk(Math.min(0.02, main[1]), main[2], 12),
+      "photo-ink-muted": onInk(Math.min(0.03, main[1]), main[2], 7),
+      "photo-ink-accent": onInk(Math.min(0.16, Math.max(0.1, pC)), pH, 4.5),
+      "photo-mean": meanHex,
+    };
+    const block = (sel, t) => `${sel} {\n${[
+      ...Object.entries(t.roles).map(([k, v]) => `  --${k}: ${oklchCss(v)};`),
+      ...Object.entries(t.ramps).flatMap(([n, s]) => s.map((v, i) => `  --${n}-${i + 1}: ${oklchCss(v)};`)),
+      `  --accent: var(--secondary-3);`, `  --accent-foreground: var(--secondary-12);`,
+      ...Object.entries(inkVars).map(([k, v]) => `  --${k}: ${oklchCss(v)};`),
+    ].join("\n")}\n}`;
+    const entryCss = [
+      `/* ${pick.id}: ${meta.activity?.name ?? ""} (${meta.activity?.date ?? ""}). Seeds ${seeds.primary} / ${seeds.secondary} (${seeds.from}), contrast ${pal.level} */`,
+      block(`[data-photo="${pick.id}"]`, pal.themes.light),
+      block(`.dark [data-photo="${pick.id}"]`, pal.themes.dark),
+    ].join("\n");
+    css.push(entryCss);
+    manifest.push({
+      id: pick.id,
+      width, height,
+      source,
+      focus: pick.focus ?? "50% 50%",
+      activity: { ...meta.activity, ...(races.get(Number(meta.activity?.id)) ?? {}) },
+      ...(meta.caption ? { caption: meta.caption } : {}),
+      sizes,
+      placeholder,
+      colours: {
+        mean: meanHex,
+        ink,
+        inkText: inkVars["photo-ink-foreground"],
+        primary: seeds.primary,
+        secondary: seeds.secondary,
+        from: seeds.from,
+        main: colours.clusters.slice(0, 5).map((c) => ({ hex: oklchToHex(c.lch), share: +c.share.toFixed(3) })),
+      },
+      css: entryCss,
+    });
+    console.log(`${pick.id}: seeds ${seeds.primary} ${seeds.secondary}`);
+  }
+  writeFileSync(join(OUT_SRC, "backgrounds.json"), JSON.stringify(manifest, null, 1) + "\n");
+  writeFileSync(join(OUT_SRC, "palettes.css"), `/* Generated by scripts/backgrounds/backgrounds.mjs from each background photo; do not edit.\n   Every block is ux-research palette.mjs output for the photo's own colours (see seedsFrom). */\n\n${css.join("\n\n")}\n`);
+}
+
+// ---------------------------------------------------------------------------------------------
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [cmd, ...rest] = process.argv.slice(2);
+  const option = (name) => (rest.includes(name) ? rest[rest.indexOf(name) + 1] : undefined);
+  const run = cmd === "review" ? review() : cmd === "build" ? build({ photos: option("--photos"), originals: option("--originals") }) : Promise.reject(new Error("usage: backgrounds.mjs review | build [--photos <dir>] [--originals <export dir>]"));
+  run.catch((e) => { console.error(e.message ?? e); process.exit(1); });
+}
