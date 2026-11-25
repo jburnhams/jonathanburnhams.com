@@ -1,74 +1,90 @@
 [
- {
-  "id": "3164050960_3",
-  "note": "Trans Gran Canaria: on a summit above the caldera"
- },
- {
-  "id": "6946389949_9",
-  "note": "Northern Traverse: the Nine Standards cairns"
- },
- {
-  "id": "19476529817_0",
-  "note": "Beacons Way 100: two runners by a cairn"
- },
- {
-  "id": "6946389949_6",
-  "note": "Northern Traverse: a Lake District valley"
- },
- {
-  "id": "11987422020_13",
-  "note": "Crossing Switzerland: a path toward the peaks"
- },
- {
-  "id": "7230974312_12",
-  "note": "Cape Wrath Ultra: a runner below the ridges"
- },
- {
-  "id": "7230974312_9",
-  "note": "Cape Wrath Ultra: a sea loch"
- },
- {
-  "id": "7230974312_6",
-  "note": "Cape Wrath Ultra: a pony on the shore"
- },
- {
-  "id": "7230974312_13",
-  "note": "Cape Wrath Ultra: a beached boat"
- },
- {
-  "id": "5393258580_3",
-  "note": "West Highland Way: Loch Lomond"
- },
- {
-  "id": "10593231920_5",
-  "note": "Spine Race: sunrise over the moor"
- },
- {
-  "id": "9074213883_0",
-  "note": "Ultra-Trail Snowdonia: a valley in cloud"
- },
- {
-  "id": "13968465216_4",
-  "note": "Norm's Helium Loops: on the coast path"
- },
- {
-  "id": "7723983274_4",
-  "note": "UTMB: the col marker"
- },
- {
-  "id": "7723983274_10",
-  "note": "UTMB: in the valley"
- },
- {
-  "id": "7560487585_3",
-  "note": "Lakeland 100: Ullswater"
- },
- {
-  "id": "3164050960_5",
-  "note": "Trans Gran Canaria: Roque Nublo"
- },
- {
-  "id": "5686686878_0",
-  "note": "Lakeland 50: a reservoir"
- }
+  {
+    "id": "3164050960_3",
+    "note": "Trans Gran Canaria: on a summit above the caldera",
+    "focus": "70% 40%"
+  },
+  {
+    "id": "6946389949_9",
+    "note": "Northern Traverse: the Nine Standards cairns",
+    "focus": "70% 55%"
+  },
+  {
+    "id": "19476529817_0",
+    "note": "Beacons Way 100: two runners by a cairn",
+    "focus": "75% 35%"
+  },
+  {
+    "id": "6946389949_6",
+    "note": "Northern Traverse: a Lake District valley",
+    "focus": "50% 55%"
+  },
+  {
+    "id": "11987422020_13",
+    "note": "Crossing Switzerland: a path toward the peaks",
+    "focus": "55% 55%"
+  },
+  {
+    "id": "7230974312_12",
+    "note": "Cape Wrath Ultra: a runner below the ridges",
+    "focus": "75% 80%"
+  },
+  {
+    "id": "7230974312_9",
+    "note": "Cape Wrath Ultra: a sea loch",
+    "focus": "40% 60%"
+  },
+  {
+    "id": "7230974312_6",
+    "note": "Cape Wrath Ultra: a pony on the shore",
+    "focus": "50% 55%"
+  },
+  {
+    "id": "7230974312_13",
+    "note": "Cape Wrath Ultra: a beached boat",
+    "focus": "30% 55%"
+  },
+  {
+    "id": "5393258580_3",
+    "note": "West Highland Way: Loch Lomond"
+  },
+  {
+    "id": "10593231920_5",
+    "note": "Spine Race: sunrise over the moor",
+    "focus": "50% 40%"
+  },
+  {
+    "id": "9074213883_0",
+    "note": "Ultra-Trail Snowdonia: a valley in cloud",
+    "focus": "50% 55%"
+  },
+  {
+    "id": "13968465216_4",
+    "note": "Norm's Helium Loops: on the coast path",
+    "focus": "45% 55%"
+  },
+  {
+    "id": "7723983274_4",
+    "note": "UTMB: the col marker"
+  },
+  {
+    "id": "7723983274_10",
+    "note": "UTMB: in the valley",
+    "focus": "57% 40%"
+  },
+  {
+    "id": "7560487585_3",
+    "note": "Lakeland 100: Ullswater",
+    "focus": "50% 60%"
+  },
+  {
+    "id": "3164050960_5",
+    "note": "Trans Gran Canaria: Roque Nublo",
+    "focus": "45% 45%"
+  },
+  {
+    "id": "5686686878_0",
+    "note": "Lakeland 50: a reservoir",
+    "focus": "75% 55%"
+  }
 ]

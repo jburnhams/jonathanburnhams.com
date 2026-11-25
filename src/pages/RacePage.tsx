@@ -88,7 +88,7 @@ const RacePage = () => {
     document.title = `${activity.name} (${activity.startDate.getFullYear()}) | Jonathan Burnhams`;
     return (
       <>
-        {own ? <PhotoBand photo={own} title={activity.name} /> : <PlainBand title={activity.name} />}
+        {own ? <PhotoBand photo={own} title={activity.name} named={false} /> : <PlainBand title={activity.name} />}
         <RaceBody activity={activity} />
       </>
     );

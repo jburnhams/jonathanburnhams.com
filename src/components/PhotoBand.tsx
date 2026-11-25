@@ -6,7 +6,7 @@ import type { Background } from '../backgrounds';
 import { Backdrop } from './home/Backdrop';
 import { PhotoCaption } from './home/PhotoCaption';
 
-export function PhotoBand({ photo, title, children }: { photo: Background; title: string; children?: ReactNode }) {
+export function PhotoBand({ photo, title, named = true, children }: { photo: Background; title: string; named?: boolean; children?: ReactNode }) {
   return (
     <div className="dark">
       <section data-photo={photo.id} aria-labelledby="page-title" className="relative grid min-h-80 content-end bg-ink text-ink-foreground md:min-h-96">
@@ -16,7 +16,7 @@ export function PhotoBand({ photo, title, children }: { photo: Background; title
             <h1 id="page-title" className="type-title text-balance">{title}</h1>
             {children && <div className="type-body text-ink-muted">{children}</div>}
           </div>
-          <PhotoCaption photo={photo} className="md:max-w-sm" />
+          <PhotoCaption photo={photo} named={named} className="md:max-w-sm" />
         </div>
       </section>
     </div>

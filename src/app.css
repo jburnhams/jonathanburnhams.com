@@ -19,7 +19,7 @@
    two lines and never passes ~9rem. */
 @utility type-name {
   font-family: var(--font-display);
-  font-size: clamp(3.25rem, 1.5rem + 7.5vw, 9rem);
+  font-size: clamp(3.25rem, 1rem + 5.5vw, 7rem);
   line-height: 0.88;
   font-weight: 700;
   font-stretch: 75%;

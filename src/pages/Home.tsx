@@ -48,8 +48,8 @@ const Home = ({ order: given }: { order?: Background[] }) => {
       <main data-photo={photo?.id} className="relative flex min-h-dvh flex-col bg-ink text-ink-foreground md:block">
         {photo && <Backdrop photo={photo} className="photo-band relative shrink-0 md:absolute md:inset-0 md:h-auto" />}
         <div className="relative flex flex-1 flex-col justify-end gap-4 p-4 md:absolute md:inset-x-0 md:bottom-0 md:flex-row md:items-end md:justify-between md:p-8">
-          <section aria-labelledby="name" className="grid gap-5 rounded-surface bg-ink md:max-w-2xl md:p-8">
-            <h1 id="name" className="type-name text-balance">Jonathan Burnhams</h1>
+          <section aria-labelledby="name" className="grid gap-5 rounded-surface bg-ink md:w-fit md:p-8">
+            <h1 id="name" className="type-name md:w-min">Jonathan Burnhams</h1>
             <nav aria-label="Elsewhere">
               <ul className="flex flex-wrap gap-x-6 gap-y-2">
                 {PLACES.map(p => (

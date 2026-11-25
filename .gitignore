@@ -29,3 +29,6 @@ coverage
 
 # Photo downloads for scripts/backgrounds (the outputs are committed)
 .cache
+
+# Contact sheets from `backgrounds.mjs review` (the workflow uploads them as an artifact)
+.photo-review
