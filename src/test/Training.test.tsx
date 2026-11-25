@@ -121,4 +121,22 @@ describe('Training page', () => {
     renderWithStrata(<Training today={TODAY} />)
     expect(await screen.findByRole('alert')).toHaveTextContent('The training log could not be read from strava-sync.')
   })
+
+  it('reloads the weekly bars on Try again after only they failed', async () => {
+    const user = userEvent.setup()
+    let failed = false
+    server.use(http.get(`${TRAINING_API}/summary`, ({ request }) => {
+      if (failed || new URL(request.url).searchParams.get('period') !== 'week') return undefined
+      failed = true
+      return new HttpResponse(null, { status: 500 })
+    }))
+    renderWithStrata(<Training today={TODAY} />)
+    const alert = await screen.findByRole('alert')
+    expect(screen.queryAllByTestId('volume-bar')).toHaveLength(0)
+    await user.click(within(alert).getByRole('button'))
+    await waitFor(() => {
+      const titles = screen.getAllByTestId('volume-bar').map(b => b.querySelector('title')?.textContent ?? '')
+      expect(titles.some(t => !t.endsWith(': nothing'))).toBe(true)
+    })
+  })
 })

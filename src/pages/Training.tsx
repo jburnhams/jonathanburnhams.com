@@ -83,6 +83,8 @@ const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: s
   const [racesOnly, setRacesOnly] = useState(false);
   const racePages = useRacePages();
   const request = useRef(0);
+  // Bumped by Retry so the summary effects run again even when their filters have not changed
+  const [attempt, setAttempt] = useState(0);
 
   const raceParam = useMemo((): Record<string, string> => (includeRaces ? {} : { race: '0' }), [includeRaces]);
   const fail = useCallback((err: unknown) => setError(err instanceof Error ? err.message : 'An error occurred'), []);
@@ -90,7 +92,7 @@ const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: s
   // Yearly totals (all years): the totals table, the Yearly chart and the year selectors
   useEffect(() => {
     getSummary({ period: 'year', ...raceParam }).then(setYearly).catch(fail);
-  }, [raceParam, fail]);
+  }, [raceParam, fail, attempt]);
 
   // Weekly or monthly bars for the chosen range, fetched when first shown
   const range = useMemo(
@@ -100,7 +102,7 @@ const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: s
   useEffect(() => {
     if (!range) return;
     getSummary({ period, from: range.from, to: range.to, ...raceParam }).then(setChartRows).catch(fail);
-  }, [period, range, raceParam, fail]);
+  }, [period, range, raceParam, fail, attempt]);
 
   // The session list's filters as API parameters (the chart view only matters while a bar is selected)
   const barFilter = selectedPeriod ? periodRange(period, selectedPeriod) : null;
@@ -165,7 +167,7 @@ const Training = ({ today = new Date().toISOString().slice(0, 10) }: { today?: s
       <>
         <PlainBand title="Training">{intro}</PlainBand>
         <div className="mx-auto max-w-6xl px-4 py-8 md:px-8" role="alert">
-          <LoadError message="The training log could not be read from strava-sync." retry={() => { setError(null); fetchPage(0); getSummary({ period: 'year', ...raceParam }).then(setYearly).catch(fail); }} />
+          <LoadError message="The training log could not be read from strava-sync." retry={() => { setError(null); fetchPage(0); setAttempt(n => n + 1); }} />
         </div>
       </>
     );
