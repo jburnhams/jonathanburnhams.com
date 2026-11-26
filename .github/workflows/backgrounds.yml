@@ -47,7 +47,7 @@ jobs:
         if: inputs.review
         run: node scripts/backgrounds/backgrounds.mjs review
       - if: inputs.review
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: photo-review
           path: .photo-review
